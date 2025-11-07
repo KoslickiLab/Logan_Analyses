@@ -55,7 +55,7 @@ class Config:
     # Which coverages to draw violins for:
     #   - None  => make a violin figure for EVERY coverage column
     #   - ["taxa_coverage_0", ...] => only those
-    violin_coverages: ["taxa_coverage_1", "taxa_coverage_0_5", "taxa_coverage_0_25", "taxa_coverage_0_125", "taxa_coverage_0_0625", "taxa_coverage_0_03125", "taxa_coverage_0_015625", "taxa_coverage_0"]
+    violin_coverages = ["taxa_coverage_1", "taxa_coverage_0_5", "taxa_coverage_0_25", "taxa_coverage_0_125", "taxa_coverage_0_0625", "taxa_coverage_0_03125", "taxa_coverage_0_015625", "taxa_coverage_0"]
     # Turn off extrema whiskers to avoid "error-bar" look
     violin_show_extrema: bool = False
     # Keep median line
