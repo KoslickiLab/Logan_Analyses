@@ -51,6 +51,16 @@ class Config:
     # Coverage to use for violin/time-series plots by default
     default_timeseries_coverage: str | None = "taxa_coverage_0"
 
+    # VIOLIN PLOT SETTINGS
+    # Which coverages to draw violins for:
+    #   - None  => make a violin figure for EVERY coverage column
+    #   - ["taxa_coverage_0", ...] => only those
+    violin_coverages: ["taxa_coverage_1", "taxa_coverage_0_5", "taxa_coverage_0_25", "taxa_coverage_0_125", "taxa_coverage_0_0625", "taxa_coverage_0_03125", "taxa_coverage_0_015625", "taxa_coverage_0"]
+    # Turn off extrema whiskers to avoid "error-bar" look
+    violin_show_extrema: bool = False
+    # Keep median line
+    violin_show_median: bool = True
+
     # Aggregations to compute for time series plots
     # Built-ins: "mean", "median", "geometric_mean", "trimmed_mean_pXX", "winsorized_mean_pXX"
     #   where pXX is the proportion to cut/winsorize on each tail (e.g., p10 => 0.10).
@@ -292,23 +302,33 @@ def main(cfg: Config = CFG):
             plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
             savefig(cfg.out_dir_plots / "histograms" / f"hist_{cov}_ALL.png")
 
-    # 2) VIOLIN PLOT — alpha diversity over years for a selected coverage
-    violin_cov = cfg.default_timeseries_coverage or coverage_cols[-1]
-    if violin_cov not in coverage_cols:
-        print(f"Requested violin coverage {violin_cov} not found; using {coverage_cols[-1]}", file=sys.stderr)
-        violin_cov = coverage_cols[-1]
+        # 2) VIOLIN PLOTS — alpha diversity over years for selected coverages
+        if cfg.violin_coverages is None:
+            violin_covs = coverage_cols[:]  # all coverages
+        else:
+            violin_covs = [c for c in cfg.violin_coverages if c in coverage_cols]
+            if not violin_covs:
+                print("No valid violin_coverages found; defaulting to all coverage columns.", file=sys.stderr)
+                violin_covs = coverage_cols[:]
 
-    viol_df = long_all[long_all["coverage"] == violin_cov].copy()
-    if not viol_df.empty:
-        # Prepare data grouped by year
-        data_by_year = [viol_df[viol_df["year"] == yr]["alpha_diversity"].values for yr in years]
-        plt.figure()
-        vp = plt.violinplot(data_by_year, showmeans=False, showmedians=True, showextrema=True)
-        plt.title(f"Alpha Diversity over Time — Violin ({violin_cov})")
-        plt.xlabel("Year")
-        plt.ylabel("Observed alpha diversity")
-        plt.xticks(ticks=range(1, len(years) + 1), labels=[str(y) for y in years], rotation=45, ha="right")
-        savefig(cfg.out_dir_plots / "violin" / f"violin_{violin_cov}.png")
+        for violin_cov in violin_covs:
+            viol_df = long_all[long_all["coverage"] == violin_cov]
+            if viol_df.empty:
+                continue
+            data_by_year = [viol_df[viol_df["year"] == yr]["alpha_diversity"].values for yr in years]
+            plt.figure()
+            plt.violinplot(
+                data_by_year,
+                showmeans=False,
+                showmedians=cfg.violin_show_median,
+                showextrema=cfg.violin_show_extrema,
+                widths=0.9,
+            )
+            plt.title(f"Alpha Diversity over Time — Violin ({violin_cov})")
+            plt.xlabel("Year")
+            plt.ylabel("Observed alpha diversity")
+            plt.xticks(ticks=range(1, len(years) + 1), labels=[str(y) for y in years], rotation=45, ha="right")
+            savefig(cfg.out_dir_plots / "violin" / f"violin_{violin_cov}.png")
 
     # 3) TIME SERIES — average over years with error bars per aggregator
     err = error_fn(cfg.error_metric)
