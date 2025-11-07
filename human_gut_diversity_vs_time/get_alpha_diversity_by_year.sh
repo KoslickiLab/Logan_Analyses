@@ -24,7 +24,7 @@ COPY (
     ) s ON p.sample_id = s.sample_id
     WHERE p.min_coverage IN (1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0)
     GROUP BY p.sample_id
-) TO '/scratch/dmk333_new/Logan/ANALYSES/human_gut_diversity_vs_time/alpha_diversity_${year}.csv' (HEADER);
+) TO '/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/alpha_diversity_${year}.csv' (HEADER);
 EOF
   end_time=$(date +%s)
   elapsed=$((end_time - start_time))
