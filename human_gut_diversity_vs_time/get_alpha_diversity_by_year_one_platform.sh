@@ -32,12 +32,12 @@ COPY (
         ) s
         JOIN meta.metadata m
           ON s.sample_id = m.acc      -- adjust this column name if needed
-        WHERE m.instrument = 'Illumina MiSeq'
+        WHERE m.instrument = 'Illumina NovaSeq 6000'
            AND m.libraryselection = 'RANDOM'
     ) s ON p.sample_id = s.sample_id
     WHERE p.min_coverage IN (1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0)
     GROUP BY p.sample_id
-) TO '/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/Illumina-MiSeq/alpha_diversity_${year}_Illumina_MiSeq.csv' (HEADER);
+) TO '/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/Illumina-NovaSeq-6000/alpha_diversity_${year}_Illumina_NovaSeq_6000.csv' (HEADER);
 EOF
   end_time=$(date +%s)
   elapsed=$((end_time - start_time))
