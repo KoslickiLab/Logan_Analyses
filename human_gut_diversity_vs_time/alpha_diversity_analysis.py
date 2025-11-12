@@ -39,7 +39,7 @@ from scipy.stats import gmean, trim_mean, mstats
 @dataclass
 class Config:
     # Directory containing alpha_diversity_YYYY.csv files
-    data_dir: Path = Path("/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results")
+    data_dir: Path = Path("/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/Illumina-MiSeq")
 
     # Years to include (inclusive)
     years: List[int] = field(default_factory=lambda: list(range(2012, 2024)))
@@ -98,7 +98,7 @@ CFG = Config()
 # Helper utilities
 # -----------------------------
 
-YEAR_RE = re.compile(r"alpha_diversity_(\d{4})\.csv$")
+YEAR_RE = re.compile(r"alpha_diversity_(\d{4})\_Illumina_MiSeq.csv$")
 
 
 def discover_years_and_files(data_dir: Path) -> Dict[int, Path]:
