@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy.stats import gmean, trim_mean, mstats
 
+
 # -----------------------------
 # CONFIG — tweak as you like
 # -----------------------------
@@ -39,7 +40,7 @@ from scipy.stats import gmean, trim_mean, mstats
 @dataclass
 class Config:
     # Directory containing alpha_diversity_YYYY.csv files
-    data_dir: Path = Path("/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/Illumina-MiSeq")
+    data_dir: Path = Path("/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/Illumina-NovaSeq-6000")
 
     # Years to include (inclusive)
     years: List[int] = field(default_factory=lambda: list(range(2012, 2024)))
@@ -55,7 +56,8 @@ class Config:
     # Which coverages to draw violins for:
     #   - None  => make a violin figure for EVERY coverage column
     #   - ["taxa_coverage_0", ...] => only those
-    violin_coverages = ["taxa_coverage_1", "taxa_coverage_0_5", "taxa_coverage_0_25", "taxa_coverage_0_125", "taxa_coverage_0_0625", "taxa_coverage_0_03125", "taxa_coverage_0_015625", "taxa_coverage_0"]
+    violin_coverages = ["taxa_coverage_1", "taxa_coverage_0_5", "taxa_coverage_0_25", "taxa_coverage_0_125",
+                        "taxa_coverage_0_0625", "taxa_coverage_0_03125", "taxa_coverage_0_015625", "taxa_coverage_0"]
     # Turn off extrema whiskers to avoid "error-bar" look
     violin_show_extrema: bool = False
     # Keep median line
@@ -93,12 +95,11 @@ class Config:
 
 CFG = Config()
 
-
 # -----------------------------
 # Helper utilities
 # -----------------------------
 
-YEAR_RE = re.compile(r"alpha_diversity_(\d{4})\_Illumina_MiSeq.csv$")
+YEAR_RE = re.compile(r"alpha_diversity_(\d{4})\_Illumina_NovaSeq_6000.csv$")
 
 
 def discover_years_and_files(data_dir: Path) -> Dict[int, Path]:
@@ -171,6 +172,7 @@ def agg_fn(name: str) -> Callable[[np.ndarray], float]:
             x = np.asarray(x, dtype=float)
             x = x[x > 0]
             return float(gmean(x)) if len(x) else float("nan")
+
         return gm
     if name.startswith("trimmed_mean_p"):
         p = parse_trim_or_winsor(name)
@@ -193,6 +195,7 @@ def error_fn(name: str) -> Callable[[np.ndarray], float]:
                 return float("nan")
             q75, q25 = np.percentile(x, [75, 25])
             return float(q75 - q25)
+
         return iqr
     if name == "ci95":
         # Symmetric half-width using normal approximation: 1.96 * std / sqrt(n)
@@ -315,7 +318,18 @@ def main(cfg: Config = CFG):
             viol_df = long_all[long_all["coverage"] == violin_cov]
             if viol_df.empty:
                 continue
-            data_by_year = [viol_df[viol_df["year"] == yr]["alpha_diversity"].values for yr in years]
+            # Only include years with data (filter out empty arrays)
+            data_by_year = []
+            years_with_data = []
+            for yr in years:
+                yr_data = viol_df[viol_df["year"] == yr]["alpha_diversity"].values
+                if len(yr_data) > 0:  # Only include years with actual data
+                    data_by_year.append(yr_data)
+                    years_with_data.append(yr)
+
+            if not data_by_year:  # Skip if no years have data
+                continue
+
             plt.figure()
             plt.violinplot(
                 data_by_year,
@@ -327,7 +341,8 @@ def main(cfg: Config = CFG):
             plt.title(f"Alpha Diversity over Time — Violin ({violin_cov})")
             plt.xlabel("Year")
             plt.ylabel("Observed alpha diversity")
-            plt.xticks(ticks=range(1, len(years) + 1), labels=[str(y) for y in years], rotation=45, ha="right")
+            plt.xticks(ticks=range(1, len(years_with_data) + 1), labels=[str(y) for y in years_with_data], rotation=45,
+                       ha="right")
             savefig(cfg.out_dir_plots / "violin" / f"violin_{violin_cov}.png")
 
     # 3) TIME SERIES — average over years with error bars per aggregator
@@ -346,7 +361,8 @@ def main(cfg: Config = CFG):
                 a_fn = agg_fn(agg_name)
                 avg = a_fn(x)
                 eb = err(x)
-                rows.append({"year": int(yr), "coverage": cov, "n": n, "aggregator": agg_name, "value": avg, "error": eb})
+                rows.append(
+                    {"year": int(yr), "coverage": cov, "n": n, "aggregator": agg_name, "value": avg, "error": eb})
         if rows:
             summary = pd.DataFrame(rows).sort_values(["aggregator", "year"])
             # Save table
