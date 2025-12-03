@@ -8,8 +8,8 @@ MATRIX_DIR="/scratch/mgs_project/matrix_unzipped/"
 DB_DIR="/scratch/mgs_project/db/"
 QUERY_PC_MAT="/scratch/dmk333_new/Logan/Logan_Analyses/metagenome_vector_sketches/build/query_pc_mat"
 OUTPUT_SUFFIX="jaccard_1.csv"
-NUM_CHUNKS=64
-NUM_JOBS=64
+NUM_CHUNKS=128
+NUM_JOBS=128
 
 # Hack to get around bug in query_pc_mat not respecting output paths
 cd /scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/output
