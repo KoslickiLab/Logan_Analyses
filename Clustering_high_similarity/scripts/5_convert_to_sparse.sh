@@ -1,0 +1,2 @@
+#!/bin/bash
+python convert_to_sparse.py /scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/pw_of_acc_with_other_jaccard_1_no_diag.npy /scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/pw_of_acc_with_other_jaccard_1_no_diag.npz
