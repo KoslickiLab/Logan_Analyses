@@ -63,7 +63,8 @@ process_chunk() {
         --query_file "$chunk_file" \
         --write_to_file "$OUTPUT_SUFFIX" \
         --no_self \
-        --min_jaccard 1
+        --min_jaccard 1 \
+	--show_all
 }
 
 export -f process_chunk
