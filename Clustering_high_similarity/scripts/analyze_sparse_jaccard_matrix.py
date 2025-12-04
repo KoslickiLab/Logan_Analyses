@@ -854,13 +854,13 @@ def main(filepath, output_dir):
     adj_list = analyze_connectivity(edges, matrix.shape[0], output_dir)
 
     # Find connected components
-    components = find_connected_components(adj_list)
+    components = find_connected_components(adj_list, output_dir)
 
     # Visualize components
     visualize_components(edges, components, output_dir, max_components=20, max_nodes_per_plot=100)
 
     # Network analysis and community detection
-    communities = network_analysis(edges)
+    communities = network_analysis(edges, output_dir)
 
     # Hierarchical clustering on sample
     hierarchical_clustering_sample(matrix, edges, max_samples=10000, output_dir=output_dir)
@@ -902,3 +902,4 @@ if __name__ == "__main__":
 
     filepath = sys.argv[1]
     output_dir = sys.argv[2]
+    main(filepath, output_dir)
