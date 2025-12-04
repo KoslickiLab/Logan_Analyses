@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Configuration
-INPUT_FILE="/scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/accessions_mbases_geq_10.txt"
+INPUT_FILE="/scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/accessions_mbases_geq_10_with_other_Jaccard_1.txt"
 MATRIX_DIR="/scratch/mgs_project/matrix_unzipped/"
 DB_DIR="/scratch/mgs_project/db/"
 QUERY_PC_MAT="/scratch/dmk333_new/Logan/Logan_Analyses/metagenome_vector_sketches/build/query_pc_mat"
