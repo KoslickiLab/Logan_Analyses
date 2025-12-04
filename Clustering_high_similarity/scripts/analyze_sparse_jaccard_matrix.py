@@ -441,7 +441,7 @@ def save_components_ragged(components, output_dir):
     # Also save as JSON for easier parsing
     json_file = os.path.join(output_dir, "components.json")
     components_dict = {
-        f"component_{i}": sorted(list(comp))
+        f"component_{i}": [int(x) for x in sorted(list(comp))]
         for i, comp in enumerate(sorted_components)
     }
     with open(json_file, 'w') as f:
@@ -677,7 +677,7 @@ def save_communities(communities, output_dir):
     # JSON format
     json_file = os.path.join(output_dir, "communities.json")
     communities_dict = {
-        f"community_{i}": sorted(list(comm))
+        f"community_{i}": [int(x) for x in sorted(comm)]
         for i, comm in enumerate(sorted_communities)
     }
     with open(json_file, 'w') as f:
