@@ -76,7 +76,7 @@ def load_sparse_matrix(filepath):
     return matrix
 
 
-def analyze_value_distribution(matrix):
+def analyze_value_distribution(matrix, output_dir):
     """Analyze the distribution of values in the sparse matrix."""
     print("\n" + "=" * 80)
     print("VALUE DISTRIBUTION ANALYSIS")
@@ -168,12 +168,12 @@ def analyze_value_distribution(matrix):
             print(f"  {label}: {count:12,} ({pct:6.2f}%)")
 
     # Plot distribution
-    plot_value_distribution(other_values)
+    plot_value_distribution(other_values, output_dir)
 
     return True, other_values
 
 
-def plot_value_distribution(values, output_dir="/mnt/user-data/outputs"):
+def plot_value_distribution(values, output_dir):
     """Create detailed plots of value distribution."""
     print("\nCreating value distribution plots...")
 
@@ -231,7 +231,7 @@ max = {np.max(values):.6f}"""
     plt.close()
 
 
-def build_edge_list_sparse(matrix, threshold=0.0):
+def build_edge_list_sparse(matrix, threshold, output_dir):
     """Build edge list from sparse matrix efficiently."""
     print("\n" + "=" * 80)
     print("BUILDING EDGE LIST FROM SPARSE MATRIX")
@@ -277,12 +277,12 @@ def build_edge_list_sparse(matrix, threshold=0.0):
     print(f"  Median: {np.median(weights):.8f}")
 
     # Save to CSV
-    save_edges_csv(edges)
+    save_edges_csv(edges, output_dir)
 
     return edges
 
 
-def save_edges_csv(edges, output_dir="/mnt/user-data/outputs"):
+def save_edges_csv(edges, output_dir):
     """Save edge list to CSV."""
     output_file = os.path.join(output_dir, "intermediate_similarity_edges.csv")
     print(f"\nSaving edges to {output_file}...")
@@ -295,7 +295,7 @@ def save_edges_csv(edges, output_dir="/mnt/user-data/outputs"):
     print(f"✓ Saved {len(edges):,} edges")
 
 
-def analyze_connectivity(edges, n_samples):
+def analyze_connectivity(edges, n_samples, output_dir):
     """Analyze connectivity patterns."""
     print("\n" + "=" * 80)
     print("CONNECTIVITY ANALYSIS")
@@ -327,7 +327,7 @@ def analyze_connectivity(edges, n_samples):
     return adj_list
 
 
-def find_connected_components(adj_list):
+def find_connected_components(adj_list, output_dir):
     """Find connected components using iterative DFS (avoids recursion limit)."""
     print("\n" + "=" * 80)
     print("CONNECTED COMPONENTS")
@@ -388,13 +388,13 @@ def find_connected_components(adj_list):
         print(f"  {i:2d}. {len(comp):8,} samples")
 
     # Save component membership
-    save_components_csv(components)
-    save_components_ragged(components)
+    save_components_csv(components, output_dir)
+    save_components_ragged(components, output_dir)
 
     return components
 
 
-def save_components_csv(components, output_dir="/mnt/user-data/outputs"):
+def save_components_csv(components, output_dir):
     """Save component membership to CSV (long format)."""
     output_file = os.path.join(output_dir, "component_membership.csv")
     print(f"\nSaving component membership to {output_file}...")
@@ -409,7 +409,7 @@ def save_components_csv(components, output_dir="/mnt/user-data/outputs"):
     print(f"✓ Saved {total_samples:,} sample-component pairs")
 
 
-def save_components_ragged(components, output_dir="/mnt/user-data/outputs"):
+def save_components_ragged(components, output_dir):
     """Save components in ragged CSV format (components as columns)."""
     output_file = os.path.join(output_dir, "components_ragged.csv")
     print(f"\nSaving ragged component format to {output_file}...")
@@ -449,7 +449,7 @@ def save_components_ragged(components, output_dir="/mnt/user-data/outputs"):
     print(f"✓ Saved components to {json_file}")
 
 
-def visualize_components(edges, components, output_dir="/mnt/user-data/outputs", max_components=10,
+def visualize_components(edges, components, output_dir, max_components=10,
                          max_nodes_per_plot=100):
     """Visualize connected components with edge weights."""
     if not NETWORKX_AVAILABLE:
@@ -577,7 +577,7 @@ def visualize_components(edges, components, output_dir="/mnt/user-data/outputs",
         f"\n✓ Created {min(n_to_plot, sum(1 for c in sorted_components[:n_to_plot] if len(c) <= max_nodes_per_plot))} component visualizations")
 
 
-def network_analysis(edges):
+def network_analysis(edges, output_dir):
     """Perform network-based community detection."""
     if not NETWORKX_AVAILABLE:
         print("\nSkipping network analysis (networkx not available)")
@@ -594,7 +594,7 @@ def network_analysis(edges):
     print(f"Graph: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
     # Save graph for future use
-    save_graph(G)
+    save_graph(G, output_dir)
 
     # Analyze largest component
     if not nx.is_connected(G):
@@ -628,7 +628,7 @@ def network_analysis(edges):
         print(f"\nModularity: {mod:.6f}")
 
         # Save communities
-        save_communities(communities)
+        save_communities(communities, output_dir)
 
     except Exception as e:
         print(f"Louvain failed: {e}")
@@ -636,7 +636,7 @@ def network_analysis(edges):
     return communities
 
 
-def save_communities(communities, output_dir="/mnt/user-data/outputs"):
+def save_communities(communities, output_dir):
     """Save community assignments."""
     # Long format CSV
     output_file = os.path.join(output_dir, "community_membership.csv")
@@ -685,7 +685,7 @@ def save_communities(communities, output_dir="/mnt/user-data/outputs"):
     print(f"✓ Saved communities to {json_file}")
 
 
-def save_graph(G, output_dir="/mnt/user-data/outputs"):
+def save_graph(G, output_dir):
     """Save NetworkX graph for future analysis."""
     output_file = os.path.join(output_dir, "graph.pickle")
     print(f"\nSaving graph to {output_file}...")
@@ -696,7 +696,7 @@ def save_graph(G, output_dir="/mnt/user-data/outputs"):
     print(f"✓ Saved graph with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 
 
-def hierarchical_clustering_sample(matrix, edges, max_samples=10000, output_dir="/mnt/user-data/outputs"):
+def hierarchical_clustering_sample(matrix, edges, max_samples, output_dir):
     """Perform hierarchical clustering on a sample of highly connected nodes."""
     if not SKLEARN_AVAILABLE:
         print("\nSkipping hierarchical clustering (sklearn/scipy not available)")
@@ -782,7 +782,7 @@ def hierarchical_clustering_sample(matrix, edges, max_samples=10000, output_dir=
     return linkage_matrix
 
 
-def plot_dendrogram(linkage_matrix, sample_ids, output_dir="/mnt/user-data/outputs", max_labels=50):
+def plot_dendrogram(linkage_matrix, sample_ids, output_dir, max_labels=50):
     """Plot hierarchical clustering dendrogram."""
     fig, ax = plt.subplots(figsize=(16, 10))
 
@@ -822,7 +822,7 @@ def plot_dendrogram(linkage_matrix, sample_ids, output_dir="/mnt/user-data/outpu
     plt.close()
 
 
-def main(filepath):
+def main(filepath, output_dir):
     """Main analysis pipeline."""
     print("=" * 80)
     print("SPARSE JACCARD MATRIX ANALYSIS WITH VISUALIZATIONS")
@@ -830,14 +830,13 @@ def main(filepath):
     print(f"\nInput: {filepath}\n")
 
     # Ensure output directory exists
-    output_dir = "/mnt/user-data/outputs"
     os.makedirs(output_dir, exist_ok=True)
 
     # Load sparse matrix
     matrix = load_sparse_matrix(filepath)
 
     # Analyze values
-    has_intermediate, other_values = analyze_value_distribution(matrix)
+    has_intermediate, other_values = analyze_value_distribution(matrix, output_dir)
 
     if not has_intermediate:
         print("\n" + "=" * 80)
@@ -846,13 +845,13 @@ def main(filepath):
         return
 
     # Build edge list
-    edges = build_edge_list_sparse(matrix, threshold=0.0)
+    edges = build_edge_list_sparse(matrix, threshold=0.0, output_dir=output_dir)
 
     if edges is None:
         return
 
     # Connectivity analysis
-    adj_list = analyze_connectivity(edges, matrix.shape[0])
+    adj_list = analyze_connectivity(edges, matrix.shape[0], output_dir)
 
     # Find connected components
     components = find_connected_components(adj_list)
@@ -897,9 +896,9 @@ def main(filepath):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python analyze_sparse_jaccard_matrix.py <path_to_sparse_matrix.npz>")
+    if len(sys.argv) != 3:
+        print("Usage: python analyze_sparse_jaccard_matrix.py <path_to_sparse_matrix.npz> <output_directory>")
         sys.exit(1)
 
     filepath = sys.argv[1]
-    main(filepath)
+    output_dir = sys.argv[2]
