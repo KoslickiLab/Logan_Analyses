@@ -66,7 +66,7 @@ result = '\n'.join(output)
 print(result)
 
 # Save to file
-with open('$OUTPUT_FILE', 'w') as f:
+with open('/scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/jaccard_1_match_statistics.txt', 'w') as f:
     f.write(result + '\n')
 
 EOF
