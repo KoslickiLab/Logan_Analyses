@@ -429,7 +429,7 @@ def create_clustermap(distance_matrix: np.ndarray,
     g.fig.suptitle(f'Hierarchical Clustering of {n_samples} Samples\n(Distance = 1 - Jaccard)',
                    y=0.98, fontsize=14)
 
-    plt.savefig(output_plot, dpi=300, bbox_inches='tight')
+    plt.savefig(output_plot, dpi=1500, bbox_inches='tight')
     plt.close()
 
     logger.info(f"Saved clustermap to {output_plot}")
