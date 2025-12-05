@@ -3,13 +3,13 @@
 set -euo pipefail
 
 # Configuration
-INPUT_FILE="/scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/accessions_mbases_geq_10.txt"
+INPUT_FILE="/scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/accessions_mbases_geq_10_with_other_Jaccard_1.txt"
 MATRIX_DIR="/scratch/mgs_project/matrix_unzipped/"
 DB_DIR="/scratch/mgs_project/db/"
 QUERY_PC_MAT="/scratch/dmk333_new/Logan/Logan_Analyses/metagenome_vector_sketches/build/query_pc_mat"
 OUTPUT_SUFFIX="jaccard_1.csv"
-NUM_CHUNKS=64
-NUM_JOBS=64
+NUM_CHUNKS=128
+NUM_JOBS=128
 
 # Hack to get around bug in query_pc_mat not respecting output paths
 cd /scratch/dmk333_new/Logan/Logan_Analyses/Clustering_high_similarity/data/output
@@ -63,7 +63,8 @@ process_chunk() {
         --query_file "$chunk_file" \
         --write_to_file "$OUTPUT_SUFFIX" \
         --no_self \
-        --min_jaccard 1
+        --min_jaccard 1 \
+	--show_all
 }
 
 export -f process_chunk
