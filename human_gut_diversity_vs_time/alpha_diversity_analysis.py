@@ -40,7 +40,7 @@ from scipy.stats import gmean, trim_mean, mstats
 @dataclass
 class Config:
     # Directory containing alpha_diversity_YYYY.csv files
-    data_dir: Path = Path("/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/Illumina-NovaSeq-6000")
+    data_dir: Path = Path("/scratch/dmk333_new/Logan/Logan_Analyses/human_gut_diversity_vs_time/results/:w!Illumina-NovaSeq-6000")
 
     # Years to include (inclusive)
     years: List[int] = field(default_factory=lambda: list(range(2012, 2024)))
