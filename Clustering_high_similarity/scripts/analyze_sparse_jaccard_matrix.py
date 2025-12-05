@@ -2,6 +2,12 @@
 """
 Optimized analysis for SPARSE Jaccard matrix with visualizations.
 Works with scipy.sparse CSR/CSC format matrices.
+
+FIXES APPLIED:
+- JSON serialization (numpy int32 to Python int)
+- Pickle protocol (HIGHEST_PROTOCOL for large graphs)
+- Graph saving (optional with --save-graph flag)
+- Resume capability (--resume flag loads edges from CSV)
 """
 
 import numpy as np
@@ -231,7 +237,7 @@ max = {np.max(values):.6f}"""
     plt.close()
 
 
-def build_edge_list_sparse(matrix, threshold, output_dir):
+def build_edge_list_sparse(matrix, threshold=0.0, output_dir="."):
     """Build edge list from sparse matrix efficiently."""
     print("\n" + "=" * 80)
     print("BUILDING EDGE LIST FROM SPARSE MATRIX")
@@ -250,8 +256,9 @@ def build_edge_list_sparse(matrix, threshold, output_dir):
 
     for i, j, val in zip(matrix_coo.row, matrix_coo.col, matrix_coo.data):
         # Only upper triangle to avoid duplicates
+        # FIX: Don't exclude 1.0 values - they represent exact duplicates between different samples
         if i < j and val > threshold:
-            edges.append((i, j, val))
+            edges.append((int(i), int(j), float(val)))
 
         n_processed += 1
         if n_processed % 1000000 == 0:
@@ -282,6 +289,22 @@ def build_edge_list_sparse(matrix, threshold, output_dir):
     return edges
 
 
+def load_edges_from_csv(output_dir):
+    """Load edges from CSV file (for resuming analysis)."""
+    input_file = os.path.join(output_dir, "intermediate_similarity_edges.csv")
+    print(f"\nLoading edges from {input_file}...")
+
+    edges = []
+    with open(input_file, 'r') as f:
+        next(f)  # Skip header
+        for line in f:
+            i, j, v = line.strip().split(',')
+            edges.append((int(i), int(j), float(v)))
+
+    print(f"✓ Loaded {len(edges):,} edges")
+    return edges
+
+
 def save_edges_csv(edges, output_dir):
     """Save edge list to CSV."""
     output_file = os.path.join(output_dir, "intermediate_similarity_edges.csv")
@@ -308,7 +331,8 @@ def analyze_connectivity(edges, n_samples, output_dir):
         adj_list[i].append((j, v))
         adj_list[j].append((i, v))
 
-    print(f"Samples with connections: {len(adj_list):,} / {n_samples:,} ({100 * len(adj_list) / n_samples:.2f}%)")
+    print(
+        f"Samples with connections: {len(adj_list):,} / {n_samples:,} ({100 * len(adj_list) / n_samples:.2f}%)")
 
     # Degree distribution
     degrees = [len(neighbors) for neighbors in adj_list.values()]
@@ -440,8 +464,9 @@ def save_components_ragged(components, output_dir):
 
     # Also save as JSON for easier parsing
     json_file = os.path.join(output_dir, "components.json")
+    # FIX: Convert numpy int32 to Python int for JSON serialization
     components_dict = {
-        f"component_{i}": [int(x) for x in sorted(list(comp))]
+        f"component_{i}": [int(x) for x in sorted(comp)]
         for i, comp in enumerate(sorted_components)
     }
     with open(json_file, 'w') as f:
@@ -449,8 +474,7 @@ def save_components_ragged(components, output_dir):
     print(f"✓ Saved components to {json_file}")
 
 
-def visualize_components(edges, components, output_dir, max_components=10,
-                         max_nodes_per_plot=100):
+def visualize_components(edges, components, output_dir, max_components=10, max_nodes_per_plot=100):
     """Visualize connected components with edge weights."""
     if not NETWORKX_AVAILABLE:
         print("\nSkipping component visualization (networkx not available)")
@@ -577,7 +601,7 @@ def visualize_components(edges, components, output_dir, max_components=10,
         f"\n✓ Created {min(n_to_plot, sum(1 for c in sorted_components[:n_to_plot] if len(c) <= max_nodes_per_plot))} component visualizations")
 
 
-def network_analysis(edges, output_dir):
+def network_analysis(edges, output_dir, save_pickle=False):
     """Perform network-based community detection."""
     if not NETWORKX_AVAILABLE:
         print("\nSkipping network analysis (networkx not available)")
@@ -593,8 +617,8 @@ def network_analysis(edges, output_dir):
 
     print(f"Graph: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
-    # Save graph for future use
-    save_graph(G, output_dir)
+    # Save graph for future use (optional)
+    save_graph(G, output_dir, save_pickle=save_pickle)
 
     # Analyze largest component
     if not nx.is_connected(G):
@@ -676,6 +700,7 @@ def save_communities(communities, output_dir):
 
     # JSON format
     json_file = os.path.join(output_dir, "communities.json")
+    # FIX: Convert numpy int32 to Python int for JSON serialization
     communities_dict = {
         f"community_{i}": [int(x) for x in sorted(comm)]
         for i, comm in enumerate(sorted_communities)
@@ -685,18 +710,24 @@ def save_communities(communities, output_dir):
     print(f"✓ Saved communities to {json_file}")
 
 
-def save_graph(G, output_dir):
+def save_graph(G, output_dir, save_pickle=False):
     """Save NetworkX graph for future analysis."""
+    # FIX: Graph saving is now optional (off by default) to avoid pickle errors
+    if not save_pickle:
+        print("\nSkipping graph pickle save (use --save-graph to enable)")
+        return
+
     output_file = os.path.join(output_dir, "graph.pickle")
     print(f"\nSaving graph to {output_file}...")
 
     with open(output_file, 'wb') as f:
-        pickle.dump(G, f)
+        # FIX: Use HIGHEST_PROTOCOL for large graphs
+        pickle.dump(G, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     print(f"✓ Saved graph with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 
 
-def hierarchical_clustering_sample(matrix, edges, max_samples, output_dir):
+def hierarchical_clustering_sample(matrix, edges, max_samples=10000, output_dir="."):
     """Perform hierarchical clustering on a sample of highly connected nodes."""
     if not SKLEARN_AVAILABLE:
         print("\nSkipping hierarchical clustering (sklearn/scipy not available)")
@@ -822,7 +853,7 @@ def plot_dendrogram(linkage_matrix, sample_ids, output_dir, max_labels=50):
     plt.close()
 
 
-def main(filepath, output_dir):
+def main(filepath, output_dir, resume=False, save_graph_pickle=False):
     """Main analysis pipeline."""
     print("=" * 80)
     print("SPARSE JACCARD MATRIX ANALYSIS WITH VISUALIZATIONS")
@@ -832,49 +863,70 @@ def main(filepath, output_dir):
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load sparse matrix
+    # CORRECTED: Always load matrix (needed for hierarchical clustering)
     matrix = load_sparse_matrix(filepath)
 
-    # Analyze values
-    has_intermediate, other_values = analyze_value_distribution(matrix, output_dir)
+    # Check if resuming from previous run
+    edges_file = os.path.join(output_dir, "intermediate_similarity_edges.csv")
 
-    if not has_intermediate:
+    if resume and os.path.exists(edges_file):
         print("\n" + "=" * 80)
-        print("CONCLUSION: No intermediate similarities")
+        print("RESUMING FROM SAVED EDGES")
         print("=" * 80)
-        return
+        print("Note: Matrix loaded for hierarchical clustering")
+        print("Skipping: value analysis, edge building, components, visualizations")
 
-    # Build edge list
-    edges = build_edge_list_sparse(matrix, threshold=0.0, output_dir=output_dir)
+        # Load edges from CSV (skip the slow edge building)
+        edges = load_edges_from_csv(output_dir)
+        other_values = None  # We don't have this, but it's only for reporting
 
-    if edges is None:
-        return
+    else:
+        # Normal flow: analyze values and build edges
+        has_intermediate, other_values = analyze_value_distribution(matrix, output_dir)
 
-    # Connectivity analysis
-    adj_list = analyze_connectivity(edges, matrix.shape[0], output_dir)
+        if not has_intermediate:
+            print("\n" + "=" * 80)
+            print("CONCLUSION: No intermediate similarities")
+            print("=" * 80)
+            return
 
-    # Find connected components
-    components = find_connected_components(adj_list, output_dir)
+        # Build edge list (this is the slow part we skip in resume mode)
+        edges = build_edge_list_sparse(matrix, threshold=0.0, output_dir=output_dir)
 
-    # Visualize components
-    visualize_components(edges, components, output_dir, max_components=20, max_nodes_per_plot=100)
+        if edges is None:
+            return
+
+        # Connectivity analysis
+        adj_list = analyze_connectivity(edges, matrix.shape[0], output_dir)
+
+        # Find connected components
+        components = find_connected_components(adj_list, output_dir)
+
+        # Visualize components
+        visualize_components(edges, components, output_dir, max_components=20, max_nodes_per_plot=100)
 
     # Network analysis and community detection
-    communities = network_analysis(edges, output_dir)
+    communities = network_analysis(edges, output_dir, save_pickle=save_graph_pickle)
 
     # Hierarchical clustering on sample
+    # CORRECTED: Matrix is always available now, so we can always run this
     hierarchical_clustering_sample(matrix, edges, max_samples=10000, output_dir=output_dir)
 
     print("\n" + "=" * 80)
     print("ANALYSIS COMPLETE")
     print("=" * 80)
     print(f"\nKey Results:")
-    print(f"  - Matrix: {matrix.shape[0]:,} × {matrix.shape[1]:,}")
-    print(f"  - Non-zero, non-one entries: {len(other_values):,}")
     print(f"  - Intermediate similarity edges: {len(edges):,}")
-    print(f"  - Samples with connections: {len(adj_list):,}")
-    print(f"  - Connected components: {len(components):,}")
-    print(f"  - Largest component: {max(len(c) for c in components):,} samples")
+    print(f"  - Matrix: {matrix.shape[0]:,} × {matrix.shape[1]:,}")
+
+    if other_values is not None:
+        print(f"  - Non-zero, non-one entries: {len(other_values):,}")
+
+    if not resume:
+        print(f"  - Samples with connections: {len(adj_list):,}")
+        print(f"  - Connected components: {len(components):,}")
+        print(f"  - Largest component: {max(len(c) for c in components):,} samples")
+
     if communities:
         print(f"  - Communities detected: {len(communities)}")
 
@@ -891,15 +943,24 @@ def main(filepath, output_dir):
     print("  - dendrogram.png")
     print("  - hierarchical_clusters.csv")
     print("  - linkage_matrix.npy")
-    print("  - graph.pickle (NetworkX graph object)")
+    print("  - graph.pickle (NetworkX graph object, if --save-graph used)")
     print("  - value_distribution.png")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python analyze_sparse_jaccard_matrix.py <path_to_sparse_matrix.npz> <output_directory>")
-        sys.exit(1)
+    import argparse
 
-    filepath = sys.argv[1]
-    output_dir = sys.argv[2]
-    main(filepath, output_dir)
+    parser = argparse.ArgumentParser(description='Analyze sparse Jaccard similarity matrix')
+    parser.add_argument('matrix_file', help='Path to sparse matrix NPZ file')
+    parser.add_argument('output_dir', help='Output directory for results')
+    parser.add_argument('--resume', action='store_true',
+                        help='Resume from saved edges CSV (skips edge building but loads matrix)')
+    parser.add_argument('--save-graph', action='store_true',
+                        help='Save NetworkX graph as pickle (disabled by default for large graphs)')
+
+    args = parser.parse_args()
+
+    if args.resume:
+        print("Resume mode: Will load matrix + edges CSV, skip to community detection")
+
+    main(args.matrix_file, args.output_dir, resume=args.resume, save_graph_pickle=args.save_graph)
