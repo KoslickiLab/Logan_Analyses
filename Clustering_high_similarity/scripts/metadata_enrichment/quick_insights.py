@@ -31,6 +31,22 @@ def quick_summary(component_file='components.json',
     with open(component_file, 'r') as f:
         components_json = json.load(f)
     
+    # Detect format: check if values are integers or strings
+    first_component = next(iter(components_json.values()))
+    if len(first_component) > 0:
+        first_value = first_component[0]
+        is_index_format = isinstance(first_value, int)
+    else:
+        is_index_format = True
+    
+    if is_index_format:
+        # Load accessions file for index-based format
+        with open(accession_file, 'r') as f:
+            accessions = [line.strip() for line in f]
+    else:
+        # Don't need accessions file for string-based format
+        accessions = None
+    
     # Convert JSON to dataframe format
     component_data = []
     for component_name, sample_ids in components_json.items():
@@ -38,18 +54,23 @@ def quick_summary(component_file='components.json',
         component_size = len(sample_ids)
         
         for sample_id in sample_ids:
-            component_data.append({
-                'sample_id': sample_id,
-                'component_id': component_id,
-                'component_size': component_size
-            })
+            if is_index_format:
+                accession = accessions[sample_id]
+                component_data.append({
+                    'sample_id': sample_id,
+                    'component_id': component_id,
+                    'component_size': component_size,
+                    'accession': accession
+                })
+            else:
+                component_data.append({
+                    'sample_id': sample_id,
+                    'component_id': component_id,
+                    'component_size': component_size,
+                    'accession': sample_id  # sample_id IS the accession
+                })
     
     components_df = pd.DataFrame(component_data)
-    
-    with open(accession_file, 'r') as f:
-        accessions = [line.strip() for line in f]
-    
-    components_df['accession'] = components_df['sample_id'].map(lambda x: accessions[x])
     
     conn = duckdb.connect(db_path, read_only=True)
     
@@ -228,7 +249,7 @@ if __name__ == '__main__':
     parser.add_argument('--components', default='components.json',
                        help='Component membership file (JSON format)')
     parser.add_argument('--accessions', default='accessions_mbases_geq_10.txt',
-                       help='Accessions list file')
+                       help='Accessions list file (only needed for index-based JSON format)')
     parser.add_argument('--database', default='metagenome_metadata_with_geo.duckdb',
                        help='Metadata database file')
     

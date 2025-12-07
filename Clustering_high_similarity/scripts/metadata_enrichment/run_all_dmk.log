@@ -1,0 +1,1191 @@
+================================================================================
+QUICK INSIGHTS SUMMARY
+================================================================================
+
+1. Loading data...
+   Total duplicated samples: 151,734
+   Total components: 70,134
+
+2. Component sizes:
+   Median size: 2
+   Mean size: 2.2
+   Largest component: 333 samples
+   Components with ≥100 samples: 2
+   Components with ≥1000 samples: 0
+
+3. Most predictive metadata fields (by homogeneity):
+   instrument                     99.7% ★★★★★★★★★
+   center_name                    99.4% ★★★★★★★★★
+   organism                       99.1% ★★★★★★★★★
+   geo_loc_name_country_calc      97.8% ★★★★★★★★★
+   bioproject                     97.4% ★★★★★★★★★
+
+4. Geographic diversity:
+   Samples have data from 119 countries
+   Top countries:
+      China                            40,650 ( 26.8%)
+      USA                              19,516 ( 12.9%)
+      uncalculated                     15,844 ( 10.4%)
+      United Kingdom                    6,049 (  4.0%)
+      Canada                            3,575 (  2.4%)
+      France                            3,527 (  2.3%)
+      Australia                         3,476 (  2.3%)
+      Germany                           3,156 (  2.1%)
+      Hong Kong                         2,761 (  1.8%)
+      Italy                             2,302 (  1.5%)
+
+5. Study (bioproject) diversity:
+   Samples span 4,974 bioprojects
+   Components with multiple bioprojects: 54,231 (77.3%)
+
+6. Sequencing center concentration:
+   Samples from 1823 centers
+   Top centers:
+      ZHEJIANG UNIVERSITY               3,563 (  2.3%)
+      TUFTS UNIVERSITY                  2,964 (  2.0%)
+      UNIVERSITY OF CALIFORNIA SAN DIEGO MICROBIOME INIT    2,717 (  1.8%)
+      THE CHINESE UNIVERSITY OF HONG KONG    2,478 (  1.6%)
+      AALBORG UNIVERSITY                2,267 (  1.5%)
+      UNIVERSITY OF BRITISH COLUMBIA    2,107 (  1.4%)
+      UNIVERSITY OF ILLINOIS AT CHICAGO    1,756 (  1.2%)
+      INSTITUTE  OF FOOD RESEARCH       1,742 (  1.1%)
+      UNIVERSITY OF NEBRASKA-LINCOLN    1,641 (  1.1%)
+      JIANGNAN UNIVERSITY               1,484 (  1.0%)
+
+7. Temporal distribution:
+   Data spans 2008 to 2023
+   Peak year: 2022 (33,447 samples)
+
+8. Preliminary red flags:
+
+9. Recommended next steps:
+   → Run full analysis: python analyze_component_metadata.py
+   → Most predictive field appears to be: instrument
+   → Check for cross-bioproject duplications: 54231 found
+
+================================================================================
+See ANALYSIS_GUIDE.md for detailed interpretation guidance
+================================================================================
+Loading component membership...
+  Detected accession-based format (strings)
+  Loaded 151,734 sample-component mappings
+  Unique components: 70,134
+
+Loading metadata from DuckDB...
+  Need metadata for 151,734 unique accessions
+  Loading metadata table (filtered)...
+  Loaded 151,734 metadata records
+  Loading location metadata (filtered)...
+  Loaded 53,508 location records
+
+Merging data...
+  Parsing lat/lon coordinates from EWKB format...
+  Successfully parsed 53,508 coordinates
+  Final merged dataset: 151,734 rows
+
+================================================================================
+COMPONENT SIZE DISTRIBUTION
+================================================================================
+
+Total components: 70,134
+Total duplicated samples: 151,734
+
+Size statistics:
+count    70134.000000
+mean         2.163487
+std          1.698309
+min          2.000000
+25%          2.000000
+50%          2.000000
+75%          2.000000
+max        333.000000
+Name: component_size, dtype: float64
+
+Size distribution:
+  Size     2:  63711 components
+  Size ≥   2:  70134 components
+  Size     3:   4933 components
+  Size ≥   3:   6423 components
+  Size     4:    999 components
+  Size ≥   4:   1490 components
+  Size     5:    250 components
+  Size ≥   5:    491 components
+  Size    10:      4 components
+  Size ≥  10:    145 components
+  Size    20:      2 components
+  Size ≥  20:    117 components
+  Size ≥  50:      4 components
+  Size ≥ 100:      2 components
+
+Largest 20 components:
+  Component  69335:      333 samples
+  Component   6603:      106 samples
+  Component  42010:       97 samples
+  Component  62284:       76 samples
+  Component  10196:       34 samples
+  Component  25766:       33 samples
+  Component  60962:       30 samples
+  Component  23943:       29 samples
+  Component  23944:       29 samples
+  Component  23945:       27 samples
+  Component  23948:       27 samples
+  Component  23946:       26 samples
+  Component  23947:       25 samples
+  Component  23949:       25 samples
+  Component  23950:       25 samples
+  Component  23951:       25 samples
+  Component  23952:       25 samples
+  Component  23953:       25 samples
+  Component  23955:       25 samples
+  Component  23956:       25 samples
+
+================================================================================
+SINGLE FIELD ENRICHMENT ANALYSIS
+================================================================================
+
+--- center_name ---
+ component_id  component_size       field  entropy                                  most_common_value  frequency  n_unique_values
+         6603             106 center_name      0.0        INSTITUTE OF CARDIOMETABOLISM AND NUTRITION        1.0                1
+        42010              97 center_name      0.0                                 UPPSALA UNIVERSITY        1.0                1
+        62284              76 center_name      0.0                                            SINOPEC        1.0                1
+        10196              34 center_name      0.0 COLORADO CENTER FOR MICROBIAL ECOLOGY, UNIVERSITY         1.0                1
+        25766              33 center_name      0.0                          THE UNIVERSITY OF ARIZONA        1.0                1
+        60962              30 center_name      0.0                                  NANKAI UNIVERSITY        1.0                1
+        23943              29 center_name      0.0                                   TUFTS UNIVERSITY        1.0                1
+        23944              29 center_name      0.0                                   TUFTS UNIVERSITY        1.0                1
+        23945              27 center_name      0.0                                   TUFTS UNIVERSITY        1.0                1
+        23948              27 center_name      0.0                                   TUFTS UNIVERSITY        1.0                1
+
+--- bioproject ---
+ component_id  component_size      field  entropy most_common_value  frequency  n_unique_values
+         6603             106 bioproject      0.0        PRJEB60243        1.0                1
+        42010              97 bioproject      0.0       PRJNA243351        1.0                1
+        25766              33 bioproject      0.0       PRJNA225620        1.0                1
+        60962              30 bioproject      0.0      PRJNA1030311        1.0                1
+        23943              29 bioproject      0.0        PRJEB49225        1.0                1
+        23944              29 bioproject      0.0        PRJEB49225        1.0                1
+        23945              27 bioproject      0.0        PRJEB49225        1.0                1
+        23948              27 bioproject      0.0        PRJEB49225        1.0                1
+        23946              26 bioproject      0.0        PRJEB49225        1.0                1
+        23947              25 bioproject      0.0        PRJEB49225        1.0                1
+
+--- sra_study ---
+ component_id  component_size     field  entropy most_common_value  frequency  n_unique_values
+         6603             106 sra_study      0.0         ERP145293        1.0                1
+        42010              97 sra_study      0.0         SRP045557        1.0                1
+        25766              33 sra_study      0.0         SRP032419        1.0                1
+        60962              30 sra_study      0.0         SRP467521        1.0                1
+        23943              29 sra_study      0.0         ERP133707        1.0                1
+        23944              29 sra_study      0.0         ERP133707        1.0                1
+        23945              27 sra_study      0.0         ERP133707        1.0                1
+        23948              27 sra_study      0.0         ERP133707        1.0                1
+        23946              26 sra_study      0.0         ERP133707        1.0                1
+        23947              25 sra_study      0.0         ERP133707        1.0                1
+
+--- organism ---
+ component_id  component_size    field  entropy     most_common_value  frequency  n_unique_values
+         6603             106 organism      0.0  human gut metagenome        1.0                1
+        42010              97 organism      0.0    aquatic metagenome        1.0                1
+        62284              76 organism      0.0       soil metagenome        1.0                1
+        10196              34 organism      0.0        gut metagenome        1.0                1
+        25766              33 organism      0.0       soil metagenome        1.0                1
+        60962              30 organism      0.0 freshwater metagenome        1.0                1
+        23943              29 organism      0.0         Vicugna pacos        1.0                1
+        23944              29 organism      0.0         Vicugna pacos        1.0                1
+        23945              27 organism      0.0         Vicugna pacos        1.0                1
+        23948              27 organism      0.0         Vicugna pacos        1.0                1
+
+--- instrument ---
+ component_id  component_size      field  entropy     most_common_value  frequency  n_unique_values
+         6603             106 instrument      0.0                MinION        1.0                1
+        42010              97 instrument      0.0   454 GS FLX Titanium        1.0                1
+        62284              76 instrument      0.0            454 GS FLX        1.0                1
+        10196              34 instrument      0.0           unspecified        1.0                1
+        60962              30 instrument      0.0 Illumina NovaSeq 6000        1.0                1
+        23943              29 instrument      0.0        Illumina MiSeq        1.0                1
+        23944              29 instrument      0.0        Illumina MiSeq        1.0                1
+        23945              27 instrument      0.0        Illumina MiSeq        1.0                1
+        23948              27 instrument      0.0        Illumina MiSeq        1.0                1
+        23946              26 instrument      0.0        Illumina MiSeq        1.0                1
+
+--- platform ---
+ component_id  component_size    field  entropy most_common_value  frequency  n_unique_values
+        69335             333 platform      0.0          ILLUMINA        1.0                1
+         6603             106 platform      0.0   OXFORD_NANOPORE        1.0                1
+        42010              97 platform      0.0             LS454        1.0                1
+        62284              76 platform      0.0             LS454        1.0                1
+        10196              34 platform      0.0             LS454        1.0                1
+        25766              33 platform      0.0          ILLUMINA        1.0                1
+        60962              30 platform      0.0          ILLUMINA        1.0                1
+        23943              29 platform      0.0          ILLUMINA        1.0                1
+        23944              29 platform      0.0          ILLUMINA        1.0                1
+        23945              27 platform      0.0          ILLUMINA        1.0                1
+
+--- librarylayout ---
+ component_id  component_size         field  entropy most_common_value  frequency  n_unique_values
+         6603             106 librarylayout      0.0            SINGLE        1.0                1
+        42010              97 librarylayout      0.0            SINGLE        1.0                1
+        62284              76 librarylayout      0.0            SINGLE        1.0                1
+        10196              34 librarylayout      0.0            SINGLE        1.0                1
+        25766              33 librarylayout      0.0            SINGLE        1.0                1
+        60962              30 librarylayout      0.0            SINGLE        1.0                1
+        23943              29 librarylayout      0.0            SINGLE        1.0                1
+        23944              29 librarylayout      0.0            SINGLE        1.0                1
+        23945              27 librarylayout      0.0            SINGLE        1.0                1
+        23948              27 librarylayout      0.0            SINGLE        1.0                1
+
+--- libraryselection ---
+ component_id  component_size            field  entropy most_common_value  frequency  n_unique_values
+         6603             106 libraryselection      0.0            RANDOM        1.0                1
+        42010              97 libraryselection      0.0               PCR        1.0                1
+        62284              76 libraryselection      0.0               PCR        1.0                1
+        10196              34 libraryselection      0.0               PCR        1.0                1
+        25766              33 libraryselection      0.0               PCR        1.0                1
+        60962              30 libraryselection      0.0               PCR        1.0                1
+        23943              29 libraryselection      0.0               PCR        1.0                1
+        23944              29 libraryselection      0.0               PCR        1.0                1
+        23945              27 libraryselection      0.0               PCR        1.0                1
+        23948              27 libraryselection      0.0               PCR        1.0                1
+
+--- geo_loc_name_country_calc ---
+ component_id  component_size                     field  entropy    most_common_value  frequency  n_unique_values
+         6603             106 geo_loc_name_country_calc      0.0 United Arab Emirates        1.0                1
+        42010              97 geo_loc_name_country_calc      0.0               Sweden        1.0                1
+        62284              76 geo_loc_name_country_calc      0.0                China        1.0                1
+        10196              34 geo_loc_name_country_calc      0.0          New Zealand        1.0                1
+        25766              33 geo_loc_name_country_calc      0.0         uncalculated        1.0                1
+        60962              30 geo_loc_name_country_calc      0.0                China        1.0                1
+        44288              25 geo_loc_name_country_calc      0.0                  USA        1.0                1
+        10198              24 geo_loc_name_country_calc      0.0          New Zealand        1.0                1
+        31217              24 geo_loc_name_country_calc      0.0                China        1.0                1
+        41894              24 geo_loc_name_country_calc      0.0                China        1.0                1
+
+--- geo_loc_name_country_continent_calc ---
+ component_id  component_size                               field  entropy most_common_value  frequency  n_unique_values
+         6603             106 geo_loc_name_country_continent_calc      0.0              Asia        1.0                1
+        42010              97 geo_loc_name_country_continent_calc      0.0            Europe        1.0                1
+        62284              76 geo_loc_name_country_continent_calc      0.0              Asia        1.0                1
+        10196              34 geo_loc_name_country_continent_calc      0.0           Oceania        1.0                1
+        25766              33 geo_loc_name_country_continent_calc      0.0      uncalculated        1.0                1
+        60962              30 geo_loc_name_country_continent_calc      0.0              Asia        1.0                1
+        44288              25 geo_loc_name_country_continent_calc      0.0     North America        1.0                1
+        10198              24 geo_loc_name_country_continent_calc      0.0           Oceania        1.0                1
+        31217              24 geo_loc_name_country_continent_calc      0.0              Asia        1.0                1
+        41894              24 geo_loc_name_country_continent_calc      0.0              Asia        1.0                1
+
+--- country ---
+  No results
+
+--- biome ---
+  No results
+
+================================================================================
+MULTI-FIELD COMBINATION PATTERNS
+================================================================================
+
+--- Combination: center_name + bioproject ---
+ component_id  component_size  n_unique_signatures                                                         most_common_signature  most_common_count  homogeneity
+         6603             106                    1 center_name=INSTITUTE OF CARDIOMETABOLISM AND NUTRITION|bioproject=PRJEB60243                106          1.0
+        42010              97                    1                         center_name=UPPSALA UNIVERSITY|bioproject=PRJNA243351                 97          1.0
+        25766              33                    1                  center_name=THE UNIVERSITY OF ARIZONA|bioproject=PRJNA225620                 33          1.0
+        60962              30                    1                         center_name=NANKAI UNIVERSITY|bioproject=PRJNA1030311                 30          1.0
+        23943              29                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225                 29          1.0
+        23944              29                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225                 29          1.0
+        23945              27                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225                 27          1.0
+        23948              27                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225                 27          1.0
+        23946              26                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225                 26          1.0
+        23947              25                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225                 25          1.0
+
+--- Combination: center_name + bioproject + sra_study ---
+ component_id  component_size  n_unique_signatures                                                                             most_common_signature  most_common_count  homogeneity
+         6603             106                    1 center_name=INSTITUTE OF CARDIOMETABOLISM AND NUTRITION|bioproject=PRJEB60243|sra_study=ERP145293                106          1.0
+        42010              97                    1                         center_name=UPPSALA UNIVERSITY|bioproject=PRJNA243351|sra_study=SRP045557                 97          1.0
+        25766              33                    1                  center_name=THE UNIVERSITY OF ARIZONA|bioproject=PRJNA225620|sra_study=SRP032419                 33          1.0
+        60962              30                    1                         center_name=NANKAI UNIVERSITY|bioproject=PRJNA1030311|sra_study=SRP467521                 30          1.0
+        23943              29                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225|sra_study=ERP133707                 29          1.0
+        23944              29                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225|sra_study=ERP133707                 29          1.0
+        23945              27                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225|sra_study=ERP133707                 27          1.0
+        23948              27                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225|sra_study=ERP133707                 27          1.0
+        23946              26                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225|sra_study=ERP133707                 26          1.0
+        23947              25                    1                            center_name=TUFTS UNIVERSITY|bioproject=PRJEB49225|sra_study=ERP133707                 25          1.0
+
+--- Combination: bioproject + organism ---
+ component_id  component_size  n_unique_signatures                                  most_common_signature  most_common_count  homogeneity
+         6603             106                    1    bioproject=PRJEB60243|organism=human gut metagenome                106          1.0
+        42010              97                    1     bioproject=PRJNA243351|organism=aquatic metagenome                 97          1.0
+        25766              33                    1        bioproject=PRJNA225620|organism=soil metagenome                 33          1.0
+        60962              30                    1 bioproject=PRJNA1030311|organism=freshwater metagenome                 30          1.0
+        23943              29                    1           bioproject=PRJEB49225|organism=Vicugna pacos                 29          1.0
+        23944              29                    1           bioproject=PRJEB49225|organism=Vicugna pacos                 29          1.0
+        23945              27                    1           bioproject=PRJEB49225|organism=Vicugna pacos                 27          1.0
+        23948              27                    1           bioproject=PRJEB49225|organism=Vicugna pacos                 27          1.0
+        23946              26                    1           bioproject=PRJEB49225|organism=Vicugna pacos                 26          1.0
+        23947              25                    1           bioproject=PRJEB49225|organism=Vicugna pacos                 25          1.0
+
+--- Combination: center_name + instrument ---
+ component_id  component_size  n_unique_signatures                                                                 most_common_signature  most_common_count  homogeneity
+         6603             106                    1             center_name=INSTITUTE OF CARDIOMETABOLISM AND NUTRITION|instrument=MinION                106          1.0
+        42010              97                    1                         center_name=UPPSALA UNIVERSITY|instrument=454 GS FLX Titanium                 97          1.0
+        62284              76                    1                                             center_name=SINOPEC|instrument=454 GS FLX                 76          1.0
+        10196              34                    1 center_name=COLORADO CENTER FOR MICROBIAL ECOLOGY, UNIVERSITY |instrument=unspecified                 34          1.0
+        60962              30                    1                        center_name=NANKAI UNIVERSITY|instrument=Illumina NovaSeq 6000                 30          1.0
+        23943              29                    1                                center_name=TUFTS UNIVERSITY|instrument=Illumina MiSeq                 29          1.0
+        23944              29                    1                                center_name=TUFTS UNIVERSITY|instrument=Illumina MiSeq                 29          1.0
+        23945              27                    1                                center_name=TUFTS UNIVERSITY|instrument=Illumina MiSeq                 27          1.0
+        23948              27                    1                                center_name=TUFTS UNIVERSITY|instrument=Illumina MiSeq                 27          1.0
+        23946              26                    1                                center_name=TUFTS UNIVERSITY|instrument=Illumina MiSeq                 26          1.0
+
+--- Combination: geo_loc_name_country_calc + bioproject ---
+ component_id  component_size  n_unique_signatures                                                most_common_signature  most_common_count  homogeneity
+         6603             106                    1 geo_loc_name_country_calc=United Arab Emirates|bioproject=PRJEB60243                106          1.0
+        42010              97                    1              geo_loc_name_country_calc=Sweden|bioproject=PRJNA243351                 97          1.0
+        25766              33                    1        geo_loc_name_country_calc=uncalculated|bioproject=PRJNA225620                 33          1.0
+        60962              30                    1              geo_loc_name_country_calc=China|bioproject=PRJNA1030311                 30          1.0
+        23943              29                    1                                                bioproject=PRJEB49225                 29          1.0
+        23944              29                    1                                                bioproject=PRJEB49225                 29          1.0
+        23945              27                    1                                                bioproject=PRJEB49225                 27          1.0
+        23948              27                    1                                                bioproject=PRJEB49225                 27          1.0
+        23946              26                    1                                                bioproject=PRJEB49225                 26          1.0
+        23947              25                    1                                                bioproject=PRJEB49225                 25          1.0
+
+================================================================================
+OUTLIER DETECTION IN HOMOGENEOUS COMPONENTS
+================================================================================
+
+--- Component 6603 (size=106) ---
+Dominant center_name: INSTITUTE OF CARDIOMETABOLISM AND NUTRITION (100.0%)
+Dominant pattern:
+  center_name: INSTITUTE OF CARDIOMETABOLISM AND NUTRITION
+  bioproject: PRJEB60243
+  geo_loc_name_country_calc: United Arab Emirates
+  organism: human gut metagenome
+  instrument: MinION
+
+No outliers found - perfectly homogeneous!
+
+--- Component 42010 (size=97) ---
+Dominant center_name: UPPSALA UNIVERSITY (100.0%)
+Dominant pattern:
+  center_name: UPPSALA UNIVERSITY
+  bioproject: PRJNA243351
+  geo_loc_name_country_calc: Sweden
+  organism: aquatic metagenome
+  instrument: 454 GS FLX Titanium
+
+No outliers found - perfectly homogeneous!
+
+--- Component 62284 (size=76) ---
+Dominant center_name: SINOPEC (100.0%)
+Dominant pattern:
+  center_name: SINOPEC
+  bioproject: PRJNA325570
+  geo_loc_name_country_calc: China
+  organism: soil metagenome
+  instrument: 454 GS FLX
+
+Found 10 outliers:
+ accession  sample_id                                    differences  n_differences
+SRR3673758 SRR3673758 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673759 SRR3673759 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673867 SRR3673867 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673869 SRR3673869 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673870 SRR3673870 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673883 SRR3673883 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673898 SRR3673898 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673919 SRR3673919 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3673940 SRR3673940 bioproject: PRJNA325372 (expected PRJNA325570)              1
+SRR3674033 SRR3674033 bioproject: PRJNA325372 (expected PRJNA325570)              1
+
+--- Component 10196 (size=34) ---
+Dominant center_name: COLORADO CENTER FOR MICROBIAL ECOLOGY, UNIVERSITY  (100.0%)
+Dominant pattern:
+  center_name: COLORADO CENTER FOR MICROBIAL ECOLOGY, UNIVERSITY 
+  bioproject: PRJEB1147
+  geo_loc_name_country_calc: New Zealand
+  organism: gut metagenome
+  instrument: unspecified
+
+Found 22 outliers:
+accession sample_id                                differences  n_differences
+ERR204332 ERR204332 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204342 ERR204342 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204343 ERR204343 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204348 ERR204348 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204352 ERR204352 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204362 ERR204362 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204368 ERR204368 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204370 ERR204370 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204371 ERR204371 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204380 ERR204380 bioproject: PRJEB1148 (expected PRJEB1147)              1
+ERR204385 ERR204385 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204388 ERR204388 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204391 ERR204391 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204394 ERR204394 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204397 ERR204397 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204400 ERR204400 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204403 ERR204403 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204406 ERR204406 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204409 ERR204409 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204412 ERR204412 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204415 ERR204415 bioproject: PRJEB1149 (expected PRJEB1147)              1
+ERR204418 ERR204418 bioproject: PRJEB1149 (expected PRJEB1147)              1
+
+--- Component 25766 (size=33) ---
+Dominant center_name: THE UNIVERSITY OF ARIZONA (100.0%)
+Dominant pattern:
+  center_name: THE UNIVERSITY OF ARIZONA
+  bioproject: PRJNA225620
+  geo_loc_name_country_calc: uncalculated
+  organism: soil metagenome
+  instrument: Illumina HiSeq 2000
+
+Found 1 outliers:
+ accession  sample_id                                               differences  n_differences
+SRR1023707 SRR1023707 instrument: Illumina MiSeq (expected Illumina HiSeq 2000)              1
+
+--- Component 60962 (size=30) ---
+Dominant center_name: NANKAI UNIVERSITY (100.0%)
+Dominant pattern:
+  center_name: NANKAI UNIVERSITY
+  bioproject: PRJNA1030311
+  geo_loc_name_country_calc: China
+  organism: freshwater metagenome
+  instrument: Illumina NovaSeq 6000
+
+No outliers found - perfectly homogeneous!
+
+--- Component 23943 (size=29) ---
+Dominant center_name: TUFTS UNIVERSITY (100.0%)
+Dominant pattern:
+  center_name: TUFTS UNIVERSITY
+  bioproject: PRJEB49225
+  organism: Vicugna pacos
+  instrument: Illumina MiSeq
+
+No outliers found - perfectly homogeneous!
+
+--- Component 23944 (size=29) ---
+Dominant center_name: TUFTS UNIVERSITY (100.0%)
+Dominant pattern:
+  center_name: TUFTS UNIVERSITY
+  bioproject: PRJEB49225
+  organism: Vicugna pacos
+  instrument: Illumina MiSeq
+
+No outliers found - perfectly homogeneous!
+
+--- Component 23945 (size=27) ---
+Dominant center_name: TUFTS UNIVERSITY (100.0%)
+Dominant pattern:
+  center_name: TUFTS UNIVERSITY
+  bioproject: PRJEB49225
+  organism: Vicugna pacos
+  instrument: Illumina MiSeq
+
+No outliers found - perfectly homogeneous!
+
+--- Component 23948 (size=27) ---
+Dominant center_name: TUFTS UNIVERSITY (100.0%)
+Dominant pattern:
+  center_name: TUFTS UNIVERSITY
+  bioproject: PRJEB49225
+  organism: Vicugna pacos
+  instrument: Illumina MiSeq
+
+No outliers found - perfectly homogeneous!
+
+================================================================================
+SAVING DETAILED RESULTS
+================================================================================
+
+Generating component metadata summaries...
+  Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/component_metadata_summary.csv
+
+Saving full merged dataset...
+  Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/merged_components_metadata.csv
+
+Analysis complete!
+Loading ../../data/full_label_prop_viz_50k_metadata_analysis/merged_components_metadata.csv...
+Loaded 151,734 rows, 70,134 components
+
+================================================================================
+STATISTICAL ENRICHMENT ANALYSIS (INTER-COMPONENT)
+================================================================================
+
+What this analysis tests:
+  • Do DIFFERENT components have DIFFERENT metadata profiles?
+  • Are certain metadata values enriched in specific components?
+  • Example: Component 0 = Center A, Component 1 = Center B
+
+This complements the earlier intra-component homogeneity analysis.
+
+Note: High sparsity in contingency tables is EXPECTED when components
+      are homogeneous! It's a signal of strong patterns, not a problem.
+================================================================================
+
+Testing 12 metadata fields for association with components...
+Minimum component size: 10
+
+[1/12] Testing center_name...
+  center_name: Sparse table (97.7% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.387
+  99.0% of components dominated by single value
+
+[2/12] Testing bioproject...
+  bioproject: Sparse table (97.8% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.405
+  95.0% of components dominated by single value
+
+[3/12] Testing sra_study...
+  sra_study: Sparse table (97.8% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.405
+  95.0% of components dominated by single value
+
+[4/12] Testing organism...
+  organism: Sparse table (96.8% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.410
+  99.0% of components dominated by single value
+
+[5/12] Testing instrument...
+  instrument: Sparse table (91.1% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.777
+  99.0% of components dominated by single value
+
+[6/12] Testing platform...
+  p-value: 0.00e+00, Cramér's V: 1.000
+  100.0% of components dominated by single value
+
+[7/12] Testing librarylayout...
+  p-value: 1.02e-282, Cramér's V: 0.760
+  99.0% of components dominated by single value
+
+[8/12] Testing libraryselection...
+  p-value: 0.00e+00, Cramér's V: 0.803
+  100.0% of components dominated by single value
+
+[9/12] Testing geo_loc_name_country_calc...
+  geo_loc_name_country_calc: Sparse table (95.2% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.612
+  97.7% of components dominated by single value
+
+[10/12] Testing geo_loc_name_country_continent_calc...
+  geo_loc_name_country_continent_calc: Sparse table (83.8% zeros) but 100.0% components have data, continuing...
+  p-value: 0.00e+00, Cramér's V: 0.918
+  97.7% of components dominated by single value
+
+[11/12] Testing country...
+
+[12/12] Testing biome...
+
+
+Applying multiple testing correction (FDR)...
+
+Significant associations (FDR < 0.05): 10 / 10
+
+================================================================================
+TOP ENRICHED FIELDS (by effect size)
+================================================================================
+
+Significant fields:
+                              field         chi2       p_value  dof  cramers_v  n_components  n_field_values  pct_dominated_components  n_samples   p_value_fdr  significant_fdr
+                           platform  5774.000000  0.000000e+00  198   1.000000           100               3                  1.000000       2887  0.000000e+00             True
+geo_loc_name_country_continent_calc  6401.706575  0.000000e+00  258   0.918027            44               7                  0.977273       1266  0.000000e+00             True
+                   libraryselection  5589.925807  0.000000e+00  297   0.803376           100               4                  1.000000       2887  0.000000e+00             True
+                         instrument 19187.604518  0.000000e+00 1089   0.777304           100              12                  0.990000       2887  0.000000e+00             True
+                      librarylayout  1665.829400 1.016223e-282   99   0.759612           100               2                  0.990000       2887 1.016223e-282             True
+          geo_loc_name_country_calc 14715.046370  0.000000e+00 1333   0.612327            44              32                  0.977273       1266  0.000000e+00             True
+                           organism 21345.143838  0.000000e+00 4356   0.409921           100              45                  0.990000       2887  0.000000e+00             True
+                         bioproject 34185.433840  0.000000e+00 7227   0.405143           100              74                  0.950000       2853  0.000000e+00             True
+                          sra_study 34185.433840  0.000000e+00 7227   0.405143           100              74                  0.950000       2853  0.000000e+00             True
+                        center_name 29037.031322  0.000000e+00 6633   0.387450           100              68                  0.990000       2887  0.000000e+00             True
+
+
+Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/statistical_enrichment_results.csv
+
+
+Analyzing interactions between significant fields...
+
+================================================================================
+PAIRWISE FIELD INTERACTION ANALYSIS
+================================================================================
+
+Testing 45 field pairs...
+  [1/45] platform × geo_loc_name_country_continent_calc... mean purity: 0.98
+  [2/45] platform × libraryselection... mean purity: 1.00
+  [3/45] platform × instrument... mean purity: 1.00
+  [4/45] platform × librarylayout... mean purity: 1.00
+  [5/45] platform × geo_loc_name_country_calc... mean purity: 0.98
+  [6/45] platform × organism... mean purity: 0.99
+  [7/45] platform × bioproject... mean purity: 0.97
+  [8/45] platform × sra_study... mean purity: 0.97
+  [9/45] platform × center_name... mean purity: 0.99
+  [10/45] geo_loc_name_country_continent_calc × libraryselection... mean purity: 0.98
+  [11/45] geo_loc_name_country_continent_calc × instrument... mean purity: 0.96
+  [12/45] geo_loc_name_country_continent_calc × librarylayout... mean purity: 0.97
+  [13/45] geo_loc_name_country_continent_calc × geo_loc_name_country_calc... mean purity: 0.98
+  [14/45] geo_loc_name_country_continent_calc × organism... mean purity: 0.93
+  [15/45] geo_loc_name_country_continent_calc × bioproject... mean purity: 0.81
+  [16/45] geo_loc_name_country_continent_calc × sra_study... mean purity: 0.81
+  [17/45] geo_loc_name_country_continent_calc × center_name... mean purity: 0.95
+  [18/45] libraryselection × instrument... mean purity: 1.00
+  [19/45] libraryselection × librarylayout... mean purity: 1.00
+  [20/45] libraryselection × geo_loc_name_country_calc... mean purity: 0.98
+  [21/45] libraryselection × organism... mean purity: 0.99
+  [22/45] libraryselection × bioproject... mean purity: 0.97
+  [23/45] libraryselection × sra_study... mean purity: 0.97
+  [24/45] libraryselection × center_name... mean purity: 0.99
+  [25/45] instrument × librarylayout... mean purity: 0.99
+  [26/45] instrument × geo_loc_name_country_calc... mean purity: 0.96
+  [27/45] instrument × organism... mean purity: 0.99
+  [28/45] instrument × bioproject... mean purity: 0.97
+  [29/45] instrument × sra_study... mean purity: 0.97
+  [30/45] instrument × center_name... mean purity: 0.99
+  [31/45] librarylayout × geo_loc_name_country_calc... mean purity: 0.97
+  [32/45] librarylayout × organism... mean purity: 0.99
+  [33/45] librarylayout × bioproject... mean purity: 0.97
+  [34/45] librarylayout × sra_study... mean purity: 0.97
+  [35/45] librarylayout × center_name... mean purity: 0.99
+  [36/45] geo_loc_name_country_calc × organism... mean purity: 0.93
+  [37/45] geo_loc_name_country_calc × bioproject... mean purity: 0.80
+  [38/45] geo_loc_name_country_calc × sra_study... mean purity: 0.80
+  [39/45] geo_loc_name_country_calc × center_name... mean purity: 0.95
+  [40/45] organism × bioproject... mean purity: 0.97
+  [41/45] organism × sra_study... mean purity: 0.97
+  [42/45] organism × center_name... mean purity: 0.99
+  [43/45] bioproject × sra_study... mean purity: 0.97
+  [44/45] bioproject × center_name... mean purity: 0.97
+  [45/45] sra_study × center_name... mean purity: 0.97
+
+================================================================================
+TOP FIELD PAIRS (by mean component purity)
+================================================================================
+                             field1                              field2  n_components  mean_purity  pct_dominated  n_combos
+                           platform                    libraryselection           117     0.999846       1.000000         6
+                           platform                       librarylayout           117     0.996638       0.991453         4
+                           platform                          instrument           117     0.996542       0.991453        14
+                   libraryselection                       librarylayout           117     0.996535       0.991453         6
+                   libraryselection                          instrument           117     0.996490       0.991453        16
+                      librarylayout                         center_name           117     0.994165       0.991453        71
+                   libraryselection                         center_name           117     0.994152       0.991453        70
+                           platform                         center_name           117     0.994152       0.991453        70
+                         instrument                       librarylayout           117     0.993949       0.991453        15
+                           organism                         center_name           117     0.991601       0.991453        95
+                      librarylayout                            organism           117     0.991418       0.991453        57
+                           platform                            organism           117     0.991393       0.991453        51
+                   libraryselection                            organism           117     0.991389       0.991453        49
+                         instrument                         center_name           117     0.991263       0.991453        76
+                         instrument                            organism           117     0.990771       0.991453        72
+                           platform geo_loc_name_country_continent_calc            16     0.981370       0.937500        12
+geo_loc_name_country_continent_calc                    libraryselection            16     0.980569       0.937500        10
+geo_loc_name_country_continent_calc           geo_loc_name_country_calc            16     0.978165       0.937500        27
+                           platform           geo_loc_name_country_calc            16     0.978165       0.937500        31
+                   libraryselection           geo_loc_name_country_calc            16     0.977364       0.937500        29
+
+Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/pairwise_field_interactions.csv
+Loading ../../data/full_label_prop_viz_50k_metadata_analysis/merged_components_metadata.csv...
+Loaded 151,734 rows, 70,134 components
+
+Running outlier detection analyses...
+
+================================================================================
+GEOGRAPHIC OUTLIERS
+================================================================================
+Finding components with samples mostly from one country but with exceptions...
+
+No geographic outliers found with current criteria.
+
+================================================================================
+GEOGRAPHIC DISTANCE ANALYSIS
+================================================================================
+Finding components with large geographic spread...
+
+Analyzed 13 components with coordinate data
+
+Top 20 components by maximum distance:
+ component_id  size  n_coords  max_distance_km  mean_distance_km  median_distance_km  n_countries                                            countries
+        69335   107       107     19745.446470       7393.068065         7613.916569           15 Spain, Germany, USA, Finland, New Zealand (+10 more)
+        26143    12        12      2471.943778       1230.978042         1174.905661            1                                                China
+        69654    14        14       495.840661        266.991125          495.840661            1                                                India
+        31217    24        24        77.444803         35.916430            0.000000            1                                                China
+        55104    17        17        44.027147         21.333943            0.905818            1                                            Argentina
+        41894    24        24        16.600969          4.811875            0.000000            1                                                China
+        61943    14        14         1.937833          0.495380            0.525943            1                                                Chile
+        31218    23        23         0.000000          0.000000            0.000000            1                                                China
+        25766    33        33         0.000000          0.000000            0.000000            1                                         uncalculated
+        59683    18        18         0.000000          0.000000            0.000000            1                                                China
+        55083    12        12         0.000000          0.000000            0.000000            1                                          South Korea
+        51944    11        11         0.000000          0.000000            0.000000            1                                               Sweden
+        69072    21        21         0.000000          0.000000            0.000000            1                                                China
+
+  Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/geographic_distances.csv
+
+Summary statistics:
+  Components with >1000 km spread: 2
+  Components with >5000 km spread: 1
+  Components with >10000 km spread: 1
+
+================================================================================
+BIOPROJECT MIXTURES
+================================================================================
+Finding components spanning multiple bioprojects...
+
+ component_id  size  n_bioprojects                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       bioprojects largest_bioproject  largest_bp_count
+        69335   333             91 PRJEB13115(54), PRJEB22907(23), PRJEB36857(17), PRJNA928382(16), PRJNA672059(15), PRJNA1040919(14), PRJNA431639(11), PRJEB26930(11), PRJEB15630(11), PRJNA283642(11), PRJEB62460(9), PRJNA517105(7), PRJNA777644(7), PRJNA967126(7), PRJNA743788(6), PRJNA447997(4), PRJNA492880(4), PRJEB32416(4), PRJEB9336(4), PRJNA640064(3), PRJEB42019(3), PRJNA638901(3), PRJEB35449(3), PRJEB27575(3), PRJNA810564(3), PRJNA980196(3), PRJEB13595(2), PRJEB19409(2), PRJEB18947(2), PRJEB40903(2), PRJEB39420(2), PRJNA494391(2), PRJNA498128(2), PRJNA315159(2), PRJNA420016(2), PRJEB42371(2), PRJEB24652(2), PRJEB67581(1), PRJEB11419(1), PRJEB14729(1), PRJEB14474(1), PRJEB15228(1), PRJEB12981(1), PRJEB36034(1), PRJEB31885(1), PRJEB27458(1), PRJEB29467(1), PRJEB18471(1), PRJEB23740(1), PRJEB24771(1), PRJEB26446(1), PRJEB14460(1), PRJNA602744(1), PRJNA565668(1), PRJNA386767(1), PRJEB43590(1), PRJEB41002(1), PRJEB39163(1), PRJEB27147(1), PRJNA830517(1), PRJNA824125(1), PRJNA808890(1), PRJNA746977(1), PRJNA764180(1), PRJNA728328(1), PRJNA736417(1), PRJNA694493(1), PRJNA644655(1), PRJNA657626(1), PRJEB50603(1), PRJEB49304(1), PRJEB53435(1), PRJNA555320(1), PRJNA830532(1), PRJNA832743(1), PRJNA323502(1), PRJNA308182(1), PRJNA1049016(1), PRJNA994572(1), PRJNA937287(1), PRJNA834828(1), PRJNA861841(1), PRJNA889401(1), PRJNA418790(1), PRJNA329077(1), PRJNA361126(1), PRJNA379981(1), PRJNA437174(1), PRJNA473257(1), PRJNA504438(1), PRJNA536254(1)         PRJEB13115                54
+        10196    34              3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       PRJEB1147(12), PRJEB1149(12), PRJEB1148(10)          PRJEB1147                12
+        62284    76              2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  PRJNA325570(66), PRJNA325372(10)        PRJNA325570                66
+        10198    24              2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      PRJEB1148(12), PRJEB1150(12)          PRJEB1148                12
+        31217    24              2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   PRJNA634344(16), PRJNA512460(8)        PRJNA634344                16
+        31218    23              2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   PRJNA634453(19), PRJNA634344(4)        PRJNA634453                19
+        10197    22              2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      PRJEB1147(12), PRJEB1149(10)          PRJEB1147                12
+
+
+Saving bioproject mixture details...
+  Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/bioproject_mixtures.csv
+
+================================================================================
+TEMPORAL CLUSTERING ANALYSIS
+================================================================================
+
+Components tightly clustered in time (year_range <= 1):
+ component_id  size  year_range  min_year  max_year  mode_year  mode_year_freq  n_years
+         6603   106           0      2023      2023       2023             1.0        1
+        42010    97           0      2015      2015       2015             1.0        1
+        62284    76           0      2016      2016       2016             1.0        1
+        10196    34           0      2014      2014       2014             1.0        1
+        60962    30           0      2023      2023       2023             1.0        1
+        23944    29           0      2022      2022       2022             1.0        1
+        23943    29           0      2022      2022       2022             1.0        1
+        23948    27           0      2022      2022       2022             1.0        1
+        23945    27           0      2022      2022       2022             1.0        1
+        23946    26           0      2022      2022       2022             1.0        1
+        23953    25           0      2022      2022       2022             1.0        1
+        23955    25           0      2022      2022       2022             1.0        1
+        23951    25           0      2022      2022       2022             1.0        1
+        23952    25           0      2022      2022       2022             1.0        1
+        23956    25           0      2022      2022       2022             1.0        1
+        23947    25           0      2022      2022       2022             1.0        1
+        23950    25           0      2022      2022       2022             1.0        1
+        23949    25           0      2022      2022       2022             1.0        1
+        23966    25           0      2022      2022       2022             1.0        1
+        23968    25           0      2022      2022       2022             1.0        1
+
+
+Components spanning many years (year_range >= 5):
+ component_id  size  year_range  min_year  max_year  mode_year  mode_year_freq  n_years
+        69335   333           8      2015      2023       2016         0.24024        9
+
+  Saved: ../../data/full_label_prop_viz_50k_metadata_analysis/temporal_patterns.csv
+
+================================================================================
+EXAMPLE: Exploring the largest component
+================================================================================
+
+================================================================================
+COMPONENT 69335 ANALYSIS
+================================================================================
+Size: 333 samples
+
+Metadata field distributions:
+--------------------------------------------------------------------------------
+
+center_name:
+  Unique values: 58
+  Top 10 values:
+    UNIVERSITY OF CALIFORNIA SAN DIEGO MICROBIOME INIT: 151 (45.3%)
+    QUEEN MARY UNIVERSITY OF LONDON: 21 (6.3%)
+    INDIANA UNIVERSITY: 16 (4.8%)
+    UNIVERSITY OF ALASKA ANCHORAGE: 14 (4.2%)
+    UNIVERSITY OF CHICAGO: 11 (3.3%)
+    UT SOUTHWESTERN MEDICAL CENTER: 11 (3.3%)
+    TS2742@NYU.EDU'S SHARED SUBMISSIONS: 11 (3.3%)
+    MASSACHUSETTS GENERAL HOSPITAL/HARVARD MEDICAL SCHOOL: 7 (2.1%)
+    HEBEI UNIVERSITY: 7 (2.1%)
+    IMPERIAL COLLEGE LONDON: 7 (2.1%)
+
+bioproject:
+  Unique values: 91
+  Top 10 values:
+    PRJEB13115: 54 (16.3%)
+    PRJEB22907: 23 (6.9%)
+    PRJEB36857: 17 (5.1%)
+    PRJNA928382: 16 (4.8%)
+    PRJNA672059: 15 (4.5%)
+    PRJNA1040919: 14 (4.2%)
+    PRJNA431639: 11 (3.3%)
+    PRJEB26930: 11 (3.3%)
+    PRJEB15630: 11 (3.3%)
+    PRJNA283642: 11 (3.3%)
+
+sra_study:
+  Unique values: 92
+  Top 10 values:
+    ERP014651: 54 (16.2%)
+    ERP104625: 23 (6.9%)
+    ERP120105: 17 (5.1%)
+    SRP419324: 16 (4.8%)
+    SRP289720: 15 (4.5%)
+    SRP472778: 14 (4.2%)
+    ERP108961: 11 (3.3%)
+    SRP132207: 11 (3.3%)
+    SRP058320: 11 (3.3%)
+    ERP017459: 11 (3.3%)
+
+organism:
+  Unique values: 43
+  Top 10 values:
+    indoor metagenome: 53 (15.9%)
+    metagenome: 33 (9.9%)
+    human skin metagenome: 23 (6.9%)
+    plant metagenome: 22 (6.6%)
+    gut metagenome: 22 (6.6%)
+    human gut metagenome: 18 (5.4%)
+    soil metagenome: 18 (5.4%)
+    human nasopharyngeal metagenome: 16 (4.8%)
+    human metagenome: 16 (4.8%)
+    invertebrate gut metagenome: 15 (4.5%)
+
+instrument:
+  Unique values: 7
+    Illumina MiSeq: 225 (67.6%)
+    Illumina HiSeq 2500: 49 (14.7%)
+    Illumina HiSeq 2000: 35 (10.5%)
+    Illumina HiSeq 4000: 18 (5.4%)
+    unspecified: 4 (1.2%)
+    Illumina HiSeq 3000: 1 (0.3%)
+    Illumina MiniSeq: 1 (0.3%)
+
+platform:
+  Unique values: 1
+    ILLUMINA: 333 (100.0%)
+
+librarylayout:
+  Unique values: 2
+    SINGLE: 202 (60.7%)
+    PAIRED: 131 (39.3%)
+
+libraryselection:
+  Unique values: 3
+    PCR: 327 (98.2%)
+    unspecified: 4 (1.2%)
+    cDNA: 2 (0.6%)
+
+geo_loc_name_country_calc:
+  Unique values: 25
+  Top 10 values:
+    USA: 203 (65.1%)
+    uncalculated: 23 (7.4%)
+    Malaysia: 16 (5.1%)
+    Canada: 14 (4.5%)
+    United Kingdom: 13 (4.2%)
+    Germany: 7 (2.2%)
+    Israel: 7 (2.2%)
+    Bolivia: 4 (1.3%)
+    Spain: 3 (1.0%)
+    Poland: 3 (1.0%)
+
+geo_loc_name_country_continent_calc:
+  Unique values: 7
+    North America: 219 (70.2%)
+    Europe: 33 (10.6%)
+    Asia: 26 (8.3%)
+    uncalculated: 23 (7.4%)
+    South America: 6 (1.9%)
+    Africa: 3 (1.0%)
+    Oceania: 2 (0.6%)
+
+releasedate:
+  Unique values: 91
+  Top 10 values:
+    2016-03-28: 54 (16.2%)
+    2017-10-11: 23 (6.9%)
+    2020-02-25: 17 (5.1%)
+    2023-03-08: 16 (4.8%)
+    2021-07-27: 15 (4.5%)
+    2023-11-18: 14 (4.2%)
+    2019-03-01: 11 (3.3%)
+    2018-07-24: 11 (3.3%)
+    2016-11-03: 11 (3.3%)
+    2017-02-03: 11 (3.3%)
+
+collection_date_sam:
+  Unique values: 63
+  Top 10 values:
+    ['2020-10-17']: 16 (12.6%)
+    ['2015-03-01']: 15 (11.8%)
+    ['2013-01-01']: 11 (8.7%)
+    ['2017-04-01']: 7 (5.5%)
+    ['2013-06-02']: 7 (5.5%)
+    ['2019-06-05']: 7 (5.5%)
+    ['2016-08-01']: 3 (2.4%)
+    ['2021-09-01']: 3 (2.4%)
+    ['2017-12-19']: 2 (1.6%)
+    ['2012-03-20']: 2 (1.6%)
+
+--------------------------------------------------------------------------------
+Sample accessions (first 20):
+  ERR1091857
+  ERR12013891
+  ERR12013896
+  ERR12013902
+  ERR12013904
+  ERR12014174
+  ERR12014538
+  ERR12021362
+  ERR12021407
+  ERR12021410
+  ERR12137598
+  ERR1306129
+  ERR1339324
+  ERR1339352
+  ERR1339371
+  ERR1339476
+  ERR1339501
+  ERR1339511
+  ERR1339601
+  ERR1339605
+  ... and 313 more
+
+================================================================================
+INTERACTIVE EXPLORATION
+================================================================================
+
+To explore specific components interactively, use:
+  df = load_merged_data()
+  explore_component(df, component_id=XXXX)
+  compare_components(df, comp_id1=XXXX, comp_id2=YYYY)
+
+Or modify and re-run this script with different parameters.
+Loading ../../data/full_label_prop_viz_50k_metadata_analysis/merged_components_metadata.csv...
+Loaded 151,734 rows
+
+================================================================================
+RUNNING STANDARD QUERY SET
+================================================================================
+
+[1/6] Large single-center components...
+
+Large components (≥100) with ≥95% from one center:
+ component_id  size                                      center  center_freq
+         6603   106 INSTITUTE OF CARDIOMETABOLISM AND NUTRITION          1.0
+
+[2/6] Geographically diverse components...
+
+Components (≥20) with samples from ≥3 countries:
+ component_id  size  n_countries                                                                countries
+        69335   333           25 USA(203), uncalculated(23), Malaysia(16), Canada(14), United Kingdom(13)
+
+[3/6] Cross-study duplications...
+
+Components (≥10) spanning ≥2 bioprojects:
+ component_id  size  n_studies                                        studies
+        69335   333         91 PRJEB13115(54), PRJEB22907(23), PRJEB36857(17)
+         2947    10         10    PRJEB11203(1), PRJEB11441(1), PRJEB12381(1)
+         2948    10         10    PRJEB11203(1), PRJEB11441(1), PRJEB12381(1)
+        10196    34          3    PRJEB1147(12), PRJEB1149(12), PRJEB1148(10)
+        10197    22          2                   PRJEB1147(12), PRJEB1149(10)
+        10198    24          2                   PRJEB1148(12), PRJEB1150(12)
+        31217    24          2                PRJNA634344(16), PRJNA512460(8)
+        31218    23          2                PRJNA634453(19), PRJNA634344(4)
+        62284    76          2               PRJNA325570(66), PRJNA325372(10)
+
+[4/6] Temporally spread components...
+
+Components (≥20) spanning ≥5 years:
+ component_id  size  min_year  max_year  year_range
+        69335   333      2015      2023           8
+
+[5/6] Mixed organism components...
+
+Components (≥10) with multiple organism types:
+ component_id  size  n_organisms                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  organisms
+        69335   333           43 indoor metagenome(53), metagenome(33), human skin metagenome(23), plant metagenome(22), gut metagenome(22), human gut metagenome(18), soil metagenome(18), human nasopharyngeal metagenome(16), human metagenome(16), invertebrate gut metagenome(15), freshwater metagenome(14), lung metagenome(11), root metagenome(10), synthetic metagenome(7), air metagenome(6), Gallus gallus(4), oil sands metagenome(4), mouse gut metagenome(3), Citrobacter rodentium(3), feces metagenome(3), biofilm metagenome(3), fish gut metagenome(2), rhizosphere metagenome(2), Zika virus(2), skin metagenome(2), mosquito metagenome(2), phyllosphere metagenome(2), human saliva metagenome(2), ant metagenome(1), hydrothermal vent metagenome(1), mouse metagenome(1), human oral metagenome(1), coral metagenome(1), hospital metagenome(1), food fermentation metagenome(1), marine metagenome(1), Homo sapiens(1), human vaginal metagenome(1), chicken gut metagenome(1), oral metagenome(1), food metagenome(1), mollusc metagenome(1), algae metagenome(1)
+        26143    12            3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    Lactococcus sp.(6), Enterobacteriaceae bacterium(3), Clostridium sp.(3)
+         2948    10            2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   gut metagenome(9), stomach metagenome(1)
+         2947    10            2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   gut metagenome(9), stomach metagenome(1)
+        10200    13            2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       gut metagenome(12), Influenza A virus (A/Gangwon/1825/2007(H3N2))(1)
+        41894    24            2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         metagenome(20), soil metagenome(4)
+
+[6/6] Summary by sequencing center...
+
+Components by center_name (top 15):
+
+Samples per center_name:
+  ZHEJIANG UNIVERSITY                         3,563 (  2.3%)
+  TUFTS UNIVERSITY                            2,964 (  2.0%)
+  UNIVERSITY OF CALIFORNIA SAN DIEGO MICROBIOME INIT    2,717 (  1.8%)
+  THE CHINESE UNIVERSITY OF HONG KONG         2,478 (  1.6%)
+  AALBORG UNIVERSITY                          2,267 (  1.5%)
+  UNIVERSITY OF BRITISH COLUMBIA              2,107 (  1.4%)
+  UNIVERSITY OF ILLINOIS AT CHICAGO           1,756 (  1.2%)
+  INSTITUTE  OF FOOD RESEARCH                 1,742 (  1.1%)
+  UNIVERSITY OF NEBRASKA-LINCOLN              1,641 (  1.1%)
+  JIANGNAN UNIVERSITY                         1,484 (  1.0%)
+  UNIVERSITY OF NEUCHATEL                     1,305 (  0.9%)
+  NANJING AGRICULTURAL UNIVERSITY             1,287 (  0.8%)
+  UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL    1,266 (  0.8%)
+  JGI                                         1,264 (  0.8%)
+  ACADEMIC CENTRE FOR DENTISTRY AMSTERDAM     1,262 (  0.8%)
+
+Components per center_name:
+  ZHEJIANG UNIVERSITY                       1,868 components
+  UNIVERSITY OF NEBRASKA-LINCOLN            1,428 components
+  JGI                                       1,262 components
+  THE CHINESE UNIVERSITY OF HONG KONG       1,245 components
+  UNIVERSITY OF CALIFORNIA SAN DIEGO MICROBIOME INIT  1,243 components
+  AALBORG UNIVERSITY                        1,084 components
+  UNIVERSITY OF BRITISH COLUMBIA            1,076 components
+  BUSM                                      1,034 components
+  BU-PHS002560                              1,034 components
+  WASHINGTON UNIVERSITY CENTER FOR GENOME SCIENCES  1,031 components
+  UNIVERSITY OF WATERL                        991 components
+  QUEEN'S UNIVERSITY                          990 components
+  INRAE                                       938 components
+  UNIVERSITY OF ILLINOIS AT CHICAGO           878 components
+  NORTHUMBRIA UNIVERSITY, NEWCASTLE           815 components
+
+================================================================================
+EXAMPLE QUERIES COMPLETE
+================================================================================
+
+To investigate specific components, use:
+  investigate_component(df, component_id=XXX)
+  compare_two_components(df, comp_id1=XXX, comp_id2=YYY)
+================================================================================
+COMPONENT METADATA ANALYSIS - MASTER PIPELINE
+================================================================================
+
+This will run the complete analysis suite.
+Estimated time: 5-30 minutes depending on data size
+
+Checking for required input files...
+✓ All required files found
+
+
+################################################################################
+# STEP 1/5
+################################################################################
+
+================================================================================
+RUNNING: Quick Insights Summary
+================================================================================
+Script: quick_insights.py
+
+
+✓ Quick Insights Summary completed successfully
+
+################################################################################
+# STEP 2/5
+################################################################################
+
+================================================================================
+RUNNING: Comprehensive Metadata Analysis
+================================================================================
+Script: analyze_component_metadata.py
+
+
+✓ Comprehensive Metadata Analysis completed successfully
+
+################################################################################
+# STEP 3/5
+################################################################################
+
+================================================================================
+RUNNING: Statistical Enrichment Testing
+================================================================================
+Script: statistical_enrichment_analysis.py
+
+
+✓ Statistical Enrichment Testing completed successfully
+
+################################################################################
+# STEP 4/5
+################################################################################
+
+================================================================================
+RUNNING: Interactive Exploration & Outlier Detection
+================================================================================
+Script: explore_components_interactive.py
+
+
+✓ Interactive Exploration & Outlier Detection completed successfully
+
+################################################################################
+# STEP 5/5
+################################################################################
+
+================================================================================
+RUNNING: Example Queries
+================================================================================
+Script: example_queries.py
+
+
+✓ Example Queries completed successfully
+
+================================================================================
+PIPELINE SUMMARY
+================================================================================
+✓ Quick Insights Summary
+✓ Comprehensive Metadata Analysis
+✓ Statistical Enrichment Testing
+✓ Interactive Exploration & Outlier Detection
+✓ Example Queries
+
+================================================================================
+OUTPUT FILES GENERATED
+================================================================================
+✓ component_metadata_summary.csv           (   6.9 MB) - Summary statistics for each component
+✓ merged_components_metadata.csv           ( 365.5 MB) - Full merged dataset
+✓ statistical_enrichment_results.csv       (   0.0 MB) - Statistical test results
+✓ pairwise_field_interactions.csv          (   0.0 MB) - Field combination analysis
+✗ geographic_outliers.csv                  - Not generated
+✓ geographic_distances.csv                 (   0.0 MB) - Geographic distance analysis with lat/lon
+✓ bioproject_mixtures.csv                  (   0.0 MB) - Cross-study duplications
+✓ temporal_patterns.csv                    (   0.0 MB) - Temporal clustering patterns
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Review ANALYSIS_GUIDE.md for interpretation guidance
+
+2. Open the CSV files in a spreadsheet program or pandas:
+   - Start with component_metadata_summary.csv for overview
+   - Check geographic_outliers.csv for surprising patterns
+   - Review statistical_enrichment_results.csv for significant fields
+
+3. For interactive investigation, use Python:
+   
+   from example_queries import *
+   df = load_data()
+   investigate_component(df, component_id=YOUR_ID)
+
+4. Create visualizations or custom analyses based on your findings
+
+5. Document interesting patterns for your research
+    
+================================================================================
+Analysis pipeline complete!
+================================================================================
+	Command being timed: "python run_all_analyses.py --components ../../data/full_label_prop_viz_50k/communities.json --accessions ../../data/accessions_mbases_geq_10_with_other_Jaccard_1.txt --output-dir ../../data/full_label_prop_viz_50k_metadata_analysis --database /scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metagenome_metadata_with_geo.duckdb.bk"
+	User time (seconds): 266.46
+	System time (seconds): 59.96
+	Percent of CPU this job got: 186%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:55.16
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 10217060
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 5
+	Minor (reclaiming a frame) page faults: 9317004
+	Voluntary context switches: 299649
+	Involuntary context switches: 3030
+	Swaps: 0
+	File system inputs: 5128
+	File system outputs: 762976
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

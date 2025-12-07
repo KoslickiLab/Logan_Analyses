@@ -1,0 +1,2 @@
+#!/bin/bash
+nohup /usr/bin/time -v python run_all_analyses.py --components ../../data/full_label_prop_viz_50k/communities.json --accessions ../../data/accessions_mbases_geq_10_with_other_Jaccard_1.txt --output-dir ../../data/full_label_prop_viz_50k_metadata_analysis --database /scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metagenome_metadata_with_geo.duckdb.bk > run_all_dmk.log 2>&1 &

@@ -22,7 +22,12 @@ def check_files_exist(component_file='components.json',
                      accession_file='accessions_mbases_geq_10.txt',
                      db_file='metagenome_metadata_with_geo.duckdb'):
     """Check that required input files exist"""
-    required_files = [component_file, accession_file, db_file]
+    # Always required
+    required_files = [component_file, db_file]
+    
+    # Accessions file is optional (only needed for index-based JSON format)
+    # We'll check if it exists if it's provided, but won't fail if it's missing
+    # (the actual code will handle the error gracefully if needed)
     
     missing = []
     for f in required_files:
@@ -35,6 +40,12 @@ def check_files_exist(component_file='components.json',
             print(f"  - {f}")
         print("\nPlease ensure these files are in the current directory.")
         return False
+    
+    # Check accessions file but only warn if missing (might not be needed)
+    if not Path(accession_file).exists():
+        print(f"Note: Accessions file '{accession_file}' not found.")
+        print("      This is OK if your components JSON uses string accessions directly.")
+        print()
     
     return True
 
@@ -222,7 +233,7 @@ if __name__ == '__main__':
     parser.add_argument('--components', default='components.json',
                        help='Component membership file (JSON format)')
     parser.add_argument('--accessions', default='accessions_mbases_geq_10.txt',
-                       help='Accessions list file')
+                       help='Accessions list file (only needed for index-based JSON format)')
     parser.add_argument('--database', default='metagenome_metadata_with_geo.duckdb',
                        help='Metadata database file')
     parser.add_argument('--output-dir', default='./',

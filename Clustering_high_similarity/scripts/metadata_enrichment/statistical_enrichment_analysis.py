@@ -64,13 +64,30 @@ def test_field_enrichment(df, field, min_component_size=10, max_categories=100):
     # Create contingency table
     contingency = pd.crosstab(df_test['component_id'], df_test[field])
     
-    # Check if table is too sparse
+    # Check if table is too sparse (but be smart about it)
     n_cells = contingency.shape[0] * contingency.shape[1]
     n_zeros = (contingency == 0).sum().sum()
+    sparsity = n_zeros / n_cells
     
-    if n_zeros / n_cells > 0.8:  # More than 80% zeros
-        print(f"  {field}: Too sparse (>80% zeros), skipping...")
+    # Check if this is "meaningful sparsity" vs "no data"
+    # Meaningful sparsity: Each component dominated by one value (high homogeneity)
+    # No data: Most components have no data for this field
+    
+    # Count how many components have at least some data
+    components_with_data = (contingency.sum(axis=1) > 0).sum()
+    pct_components_with_data = components_with_data / len(contingency)
+    
+    # Skip only if:
+    # 1. Very sparse (>95% zeros) AND
+    # 2. Most components have no data (<50% with data)
+    # This catches truly empty fields while allowing homogeneous patterns
+    if sparsity > 0.95 and pct_components_with_data < 0.5:
+        print(f"  {field}: Insufficient data ({pct_components_with_data:.1%} components with data), skipping...")
         return None
+    
+    # Warn about sparsity but continue if components have data
+    if sparsity > 0.8:
+        print(f"  {field}: Sparse table ({sparsity:.1%} zeros) but {pct_components_with_data:.1%} components have data, continuing...")
     
     try:
         # Perform chi-square test
@@ -113,6 +130,15 @@ def comprehensive_enrichment_analysis(df, fields, min_component_size=10, output_
     """
     Run enrichment tests for all specified fields and correct for multiple testing.
     
+    This performs INTER-COMPONENT analysis:
+    - Tests if DIFFERENT components are associated with DIFFERENT metadata values
+    - Example: Component 0 mostly from Center A, Component 1 mostly from Center B
+    - Complements the INTRA-COMPONENT homogeneity analysis done earlier
+    
+    High sparsity in contingency tables is EXPECTED and GOOD when:
+    - Components are highly homogeneous (intra-component)
+    - Different components have different dominant values (inter-component)
+    
     Args:
         df: DataFrame with merged component and metadata
         fields: List of metadata fields to test
@@ -123,7 +149,15 @@ def comprehensive_enrichment_analysis(df, fields, min_component_size=10, output_
     output_path.mkdir(parents=True, exist_ok=True)
     
     print("\n" + "="*80)
-    print("COMPREHENSIVE STATISTICAL ENRICHMENT ANALYSIS")
+    print("STATISTICAL ENRICHMENT ANALYSIS (INTER-COMPONENT)")
+    print("="*80)
+    print("\nWhat this analysis tests:")
+    print("  • Do DIFFERENT components have DIFFERENT metadata profiles?")
+    print("  • Are certain metadata values enriched in specific components?")
+    print("  • Example: Component 0 = Center A, Component 1 = Center B")
+    print("\nThis complements the earlier intra-component homogeneity analysis.")
+    print("\nNote: High sparsity in contingency tables is EXPECTED when components")
+    print("      are homogeneous! It's a signal of strong patterns, not a problem.")
     print("="*80)
     print(f"\nTesting {len(fields)} metadata fields for association with components...")
     print(f"Minimum component size: {min_component_size}")
@@ -311,9 +345,6 @@ def main(input_file='merged_components_metadata.csv', output_dir='./'):
         'geo_loc_name_country_continent_calc',
         'country',
         'biome',
-        'country',
-        'mbases',
-        'avgspotlen'
     ]
     
     # Run comprehensive enrichment analysis
