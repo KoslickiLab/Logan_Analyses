@@ -111,14 +111,30 @@ def create_clustermap(distance_matrix, sample_ids, linkage_matrix,
         condensed = squareform(distance_matrix, checks=False)
         linkage_matrix = recompute_linkage(condensed, method='average')
     
+    # Scale figure size for large heatmaps to avoid rasterization issues
+    # Rule: need at least 0.5 pixels per sample for proper rendering
+    min_pixels_per_sample = 0.5
+    required_pixels = n_samples * min_pixels_per_sample
+    current_pixels = min(figsize[0] * dpi, figsize[1] * dpi)
+    
+    if required_pixels > current_pixels:
+        scale_factor = required_pixels / current_pixels
+        figsize = (int(figsize[0] * scale_factor), int(figsize[1] * scale_factor))
+        logger.info(f"Scaled figure size to {figsize[0]}×{figsize[1]} inches for {n_samples} samples")
+    
     logger.info(f"Creating clustermap with {n_samples} samples")
+    
+    # Set matplotlib rasterization threshold for large heatmaps
+    # This ensures proper rendering even with dense data
+    import matplotlib
+    matplotlib.rcParams['agg.path.chunksize'] = 10000
     
     # Create clustermap with precomputed linkage
     g = sns.clustermap(
         distance_matrix,
         row_linkage=linkage_matrix,
         col_linkage=linkage_matrix,
-        cmap='viridis_r',
+        cmap='viridis',
         xticklabels=False,
         yticklabels=False,
         cbar_kws={'label': 'Distance (1 - Jaccard)'},
