@@ -477,18 +477,229 @@ def analyze_temporal_patterns(df, min_component_size=20, output_dir='./'):
     return results_df
 
 
-def main(input_file='merged_components_metadata.csv', output_dir='./'):
+def analyze_single_component(df, component_id, output_dir='./'):
+    """
+    Detailed analysis of a single component
+    
+    Args:
+        df: DataFrame with merged component and metadata
+        component_id: Component ID to analyze
+        output_dir: Directory for output files
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Filter to this component
+    comp_df = df[df['component_id'] == component_id]
+    
+    if len(comp_df) == 0:
+        print(f"\n❌ ERROR: Component {component_id} not found in dataset!")
+        print(f"\nAvailable components: {sorted(df['component_id'].unique())[:20]}")
+        if df['component_id'].nunique() > 20:
+            print(f"... and {df['component_id'].nunique() - 20} more")
+        return
+    
+    print("\n" + "="*80)
+    print(f"DETAILED ANALYSIS: COMPONENT {component_id}")
+    print("="*80)
+    
+    # Basic stats
+    print(f"\nComponent Size: {len(comp_df):,} samples")
+    print(f"Component ID: {component_id}")
+    
+    # Key metadata fields to analyze
+    analysis_fields = [
+        'center_name',
+        'bioproject',
+        'sra_study',
+        'organism',
+        'instrument',
+        'platform',
+        'librarylayout',
+        'libraryselection',
+        'geo_loc_name_country_calc',
+        'country',
+        'biome'
+    ]
+    
+    # Show distribution for each field
+    print("\n" + "-"*80)
+    print("METADATA DISTRIBUTIONS")
+    print("-"*80)
+    
+    for field in analysis_fields:
+        if field in comp_df.columns:
+            values = comp_df[field].dropna()
+            if len(values) > 0:
+                value_counts = values.value_counts()
+                total = len(values)
+                
+                print(f"\n{field}:")
+                print(f"  Total with data: {total:,} / {len(comp_df):,} ({100*total/len(comp_df):.1f}%)")
+                print(f"  Unique values: {len(value_counts)}")
+                
+                if len(value_counts) <= 10:
+                    # Show all values if <=10
+                    for val, count in value_counts.items():
+                        pct = 100 * count / total
+                        print(f"    {val}: {count:,} ({pct:.1f}%)")
+                else:
+                    # Show top 10
+                    print("  Top 10 values:")
+                    for val, count in value_counts.head(10).items():
+                        pct = 100 * count / total
+                        print(f"    {val}: {count:,} ({pct:.1f}%)")
+                    print(f"  ... and {len(value_counts) - 10} more values")
+    
+    # Geographic analysis
+    print("\n" + "-"*80)
+    print("GEOGRAPHIC ANALYSIS")
+    print("-"*80)
+    
+    if 'geo_loc_name_country_calc' in comp_df.columns:
+        countries = comp_df['geo_loc_name_country_calc'].dropna()
+        if len(countries) > 0:
+            country_counts = countries.value_counts()
+            print(f"\nCountries represented: {len(country_counts)}")
+            for country, count in country_counts.items():
+                pct = 100 * count / len(countries)
+                print(f"  {country}: {count:,} ({pct:.1f}%)")
+    
+    # Calculate geographic distances if coordinates available
+    if 'latitude' in comp_df.columns and 'longitude' in comp_df.columns:
+        coords = comp_df[['latitude', 'longitude']].dropna()
+        if len(coords) >= 2:
+            print(f"\nSamples with coordinates: {len(coords):,}")
+            
+            # Calculate pairwise distances
+            coords_list = coords.values.tolist()
+            distances = []
+            for i in range(len(coords_list)):
+                for j in range(i+1, len(coords_list)):
+                    lat1, lon1 = coords_list[i]
+                    lat2, lon2 = coords_list[j]
+                    dist = haversine_distance(lat1, lon1, lat2, lon2)
+                    distances.append(dist)
+            
+            if distances:
+                print(f"\nGeographic spread:")
+                print(f"  Max distance: {max(distances):,.1f} km")
+                print(f"  Mean distance: {np.mean(distances):,.1f} km")
+                print(f"  Median distance: {np.median(distances):,.1f} km")
+    
+    # Temporal analysis
+    print("\n" + "-"*80)
+    print("TEMPORAL ANALYSIS")
+    print("-"*80)
+    
+    # Extract years from any date fields
+    date_fields = ['releasedate', 'published', 'updated']
+    years = []
+    
+    for field in date_fields:
+        if field in comp_df.columns:
+            dates = comp_df[field].dropna()
+            for date in dates:
+                try:
+                    year = int(str(date)[:4])
+                    if 2000 <= year <= 2030:
+                        years.append(year)
+                except:
+                    pass
+    
+    if years:
+        years = sorted(years)
+        print(f"\nYear range: {min(years)} - {max(years)}")
+        print(f"Span: {max(years) - min(years)} years")
+        
+        # Year distribution
+        from collections import Counter
+        year_counts = Counter(years)
+        print("\nYear distribution:")
+        for year in sorted(year_counts.keys()):
+            count = year_counts[year]
+            pct = 100 * count / len(years)
+            print(f"  {year}: {count:,} ({pct:.1f}%)")
+    
+    # List all accessions
+    print("\n" + "-"*80)
+    print("SAMPLE ACCESSIONS")
+    print("-"*80)
+    
+    accessions = comp_df['accession'].tolist()
+    print(f"\nTotal samples: {len(accessions):,}")
+    print(f"\nFirst 20 accessions:")
+    for i, acc in enumerate(accessions[:20], 1):
+        print(f"  {i:3d}. {acc}")
+    
+    if len(accessions) > 20:
+        print(f"\n... and {len(accessions) - 20:,} more")
+    
+    # Save detailed report
+    print("\n" + "-"*80)
+    print("SAVING DETAILED REPORT")
+    print("-"*80)
+    
+    report_file = output_path / f'component_{component_id}_detailed_report.txt'
+    
+    with open(report_file, 'w') as f:
+        f.write(f"DETAILED ANALYSIS REPORT: COMPONENT {component_id}\n")
+        f.write("="*80 + "\n\n")
+        f.write(f"Component Size: {len(comp_df):,} samples\n")
+        f.write(f"Analysis Date: {pd.Timestamp.now()}\n\n")
+        
+        f.write("METADATA DISTRIBUTIONS\n")
+        f.write("-"*80 + "\n\n")
+        
+        for field in analysis_fields:
+            if field in comp_df.columns:
+                values = comp_df[field].dropna()
+                if len(values) > 0:
+                    value_counts = values.value_counts()
+                    f.write(f"{field}:\n")
+                    f.write(f"  Coverage: {len(values):,} / {len(comp_df):,} ({100*len(values)/len(comp_df):.1f}%)\n")
+                    f.write(f"  Unique values: {len(value_counts)}\n")
+                    for val, count in value_counts.items():
+                        pct = 100 * count / len(values)
+                        f.write(f"    {val}: {count:,} ({pct:.1f}%)\n")
+                    f.write("\n")
+        
+        f.write("\nALL ACCESSIONS\n")
+        f.write("-"*80 + "\n\n")
+        for acc in accessions:
+            f.write(f"{acc}\n")
+    
+    print(f"\n✓ Detailed report saved to: {report_file}")
+    
+    # Also save the component data as CSV
+    csv_file = output_path / f'component_{component_id}_samples.csv'
+    comp_df.to_csv(csv_file, index=False)
+    print(f"✓ Sample data saved to: {csv_file}")
+    
+    print("\n" + "="*80)
+    print(f"COMPONENT {component_id} ANALYSIS COMPLETE")
+    print("="*80)
+
+
+def main(input_file='merged_components_metadata.csv', output_dir='./', component_id=None):
     """
     Main analysis function
     
     Args:
         input_file: Path to merged components metadata CSV
         output_dir: Directory for output files
+        component_id: Optional component ID to analyze in detail (if None, run all analyses)
     """
     # Load data
     df = load_merged_data(input_file)
     
-    # Run surprise/outlier analyses
+    # If specific component requested, analyze just that one
+    if component_id is not None:
+        print(f"\n🔍 Focusing on Component {component_id}...")
+        analyze_single_component(df, component_id, output_dir)
+        return
+    
+    # Otherwise run all outlier analyses
     print("\nRunning outlier detection analyses...")
     
     geo_outliers = find_geographic_outliers(df, min_component_size=20, output_dir=output_dir)
@@ -496,36 +707,47 @@ def main(input_file='merged_components_metadata.csv', output_dir='./'):
     bp_mixtures = find_bioproject_mixtures(df, min_component_size=20, output_dir=output_dir)
     temporal_patterns = analyze_temporal_patterns(df, min_component_size=20, output_dir=output_dir)
     
-    # Example: explore largest component
     print("\n" + "="*80)
-    print("EXAMPLE: Exploring the largest component")
+    print("ALL ANALYSES COMPLETE")
     print("="*80)
-    largest_comp = df['component_id'].value_counts().index[0]
-    explore_component(df, largest_comp)
-    
-    print("\n" + "="*80)
-    print("INTERACTIVE EXPLORATION")
-    print("="*80)
-    print("\nTo explore specific components interactively, use:")
-    print("  df = load_merged_data()")
-    print("  explore_component(df, component_id=XXXX)")
-    print("  compare_components(df, comp_id1=XXXX, comp_id2=YYYY)")
-    print("\nOr modify and re-run this script with different parameters.")
+    print("\nTo analyze a specific component in detail, run:")
+    print(f"  python explore_components_interactive.py --component-id <ID>")
+    print("\nExample:")
+    print(f"  python explore_components_interactive.py --component-id 6603")
+    print("\nOr to explore interactively in Python:")
+    print("  from explore_components_interactive import load_merged_data, analyze_single_component")
+    print("  df = load_merged_data('merged_components_metadata.csv')")
+    print("  analyze_single_component(df, component_id=6603)")
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Interactive component exploration and outlier detection',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog="""
+Examples:
+  # Analyze all components (default behavior)
+  python explore_components_interactive.py --input merged_components_metadata.csv
+  
+  # Analyze specific component in detail
+  python explore_components_interactive.py --input merged_components_metadata.csv --component-id 6603
+  
+  # Analyze component 42 with custom output directory
+  python explore_components_interactive.py --component-id 42 --output-dir results/component_42/
+        """
     )
     parser.add_argument('--input', default='merged_components_metadata.csv',
                        help='Input merged metadata CSV file')
     parser.add_argument('--output-dir', default='./',
                        help='Output directory for results')
+    parser.add_argument('--component-id', type=int, default=None,
+                       help='Specific component ID to analyze in detail (if not provided, analyzes all components)')
     
     args = parser.parse_args()
     
     main(
         input_file=args.input,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        component_id=args.component_id
     )

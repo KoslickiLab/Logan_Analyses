@@ -1,0 +1,163 @@
+HASH-DIVERSITY CORRELATION ANALYSIS
+====================================
+Quick Start Guide
+
+STEP 1: VERIFY SETUP
+--------------------
+Run the verification script to check that everything is ready:
+
+    python3 verify_setup.py
+
+This will check:
+✓ Python version and dependencies
+✓ Database accessibility
+✓ System resources
+✓ Script files
+
+If any checks fail, follow the instructions to resolve them.
+
+
+STEP 2: RUN YOUR FIRST ANALYSIS
+--------------------------------
+Start with a quick test run to verify the pipeline works:
+
+    bash run_analysis.sh quick
+
+This will analyze 1,000 samples and complete in 2-5 minutes.
+
+Expected output:
+- Plots in: hash_diversity_results_quick_TIMESTAMP/plots/
+- Report in: hash_diversity_results_quick_TIMESTAMP/reports/
+- Data in: hash_diversity_results_quick_TIMESTAMP/data/
+
+
+STEP 3: RUN FULL ANALYSIS
+--------------------------
+Once you've verified everything works, run a more comprehensive analysis:
+
+    # Recommended: Medium analysis (50,000 samples, ~30-60 minutes)
+    bash run_analysis.sh medium
+
+    # Or specify custom parameters:
+    bash run_analysis.sh medium --jobs 256 --coverage 0.0625
+
+    # Full analysis with all samples (may take several hours):
+    bash run_analysis.sh full
+
+
+STEP 4: SENSITIVITY ANALYSIS (OPTIONAL)
+----------------------------------------
+Test how results vary with coverage threshold:
+
+    bash run_analysis.sh sensitivity
+
+This tests multiple coverage values and generates comparative plots.
+
+
+ALTERNATIVE: MANUAL EXECUTION
+------------------------------
+For more control, run the Python scripts directly:
+
+    python3 hash_diversity_correlation.py \
+        --output-dir my_results \
+        --n-samples 10000 \
+        --coverage 0.0625 \
+        --n-jobs 128 \
+        --min-mbases 100
+
+    python3 hash_diversity_sensitivity.py \
+        --output-dir my_sensitivity \
+        --n-samples 5000 \
+        --coverages 0.0625,0.125,0.25,0.5,1.0 \
+        --n-jobs 128
+
+
+KEY OUTPUT FILES
+----------------
+After running an analysis, check these files:
+
+1. Main correlation plot:
+   plots/hash_diversity_correlation.png
+   
+2. Comprehensive report:
+   reports/analysis_report.txt
+   
+3. Raw data for further analysis:
+   data/hash_diversity_data.csv
+   
+4. Statistical summary:
+   reports/statistics_summary.csv
+
+
+TROUBLESHOOTING
+---------------
+Problem: "No data extracted"
+Solution: Try different coverage threshold or reduce n-samples
+
+Problem: Slow performance  
+Solution: Increase --n-jobs or reduce --n-samples
+
+Problem: Missing dependencies
+Solution: pip install -r requirements.txt
+
+Problem: Database not accessible
+Solution: Check paths in scripts match your system
+
+
+RECOMMENDED WORKFLOW
+--------------------
+1. Run quick test: bash run_analysis.sh quick
+2. Examine outputs to verify everything looks correct
+3. Run medium analysis: bash run_analysis.sh medium
+4. Review main plot and report
+5. If needed, run sensitivity analysis
+6. Use the CSV data files for custom downstream analysis
+
+
+UNDERSTANDING THE RESULTS
+--------------------------
+The main plot shows:
+- X-axis: Distinct hashes per megabase (normalized hash count)
+- Y-axis: Alpha diversity per megabase (normalized species count)
+- Red line: Linear regression fit
+- Stats box: Correlation coefficient, p-value, R², sample count
+
+Strong positive correlation (r > 0.5, p < 0.001):
+→ Supports hypothesis that hashes correlate with diversity
+→ Hash-based metrics capture meaningful biological signal
+
+Weak correlation (r < 0.3):
+→ Other factors influence diversity more strongly
+→ May need to stratify by sample type or environment
+
+
+NEXT STEPS
+----------
+1. Examine residual plots for outliers
+2. Check distribution plots for data quality
+3. Try different coverage thresholds
+4. Stratify analysis by environment type (requires code modification)
+5. Compare with other diversity metrics
+
+
+FOR MORE INFORMATION
+--------------------
+See the full README.md for:
+- Detailed methodology
+- All command-line options
+- Output file descriptions
+- Advanced usage examples
+- Performance optimization tips
+
+
+QUESTIONS OR ISSUES?
+--------------------
+- Check README.md for detailed documentation
+- Review the analysis report for interpretation guidance
+- Examine the CSV files for unexpected data patterns
+- Run verify_setup.py to check for configuration issues
+
+
+==========================================
+HAPPY ANALYZING! 🧬📊
+==========================================
