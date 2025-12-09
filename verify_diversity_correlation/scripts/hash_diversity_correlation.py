@@ -88,8 +88,7 @@ def get_wgs_samples(config: Config) -> pd.DataFrame:
     query = f"""
     SELECT 
         acc,
-        mbases,
-        CAST(spots AS BIGINT) as reads
+        mbases
     FROM metadata_geo_joined 
     WHERE assay_type = 'WGS' 
         AND libraryselection = 'RANDOM' 
@@ -98,7 +97,7 @@ def get_wgs_samples(config: Config) -> pd.DataFrame:
     """
     
     print(f"Connecting to {METADATA_DB}...")
-    conn = duckdb.connect(METADATA_DB, read_only=True)
+    conn = duckdb.connect(METADATA_DB, read_only=True, config={'threads': 1})
     
     try:
         print("Executing query...")
@@ -135,7 +134,7 @@ def process_sample_batch(sample_ids: List[str], coverage: float) -> List[Dict]:
     Returns:
         List of dicts with keys: sample_id, num_hashes, alpha_diversity, mbases
     """
-    conn = duckdb.connect(YACHT_DB, read_only=True)
+    conn = duckdb.connect(YACHT_DB, read_only=True, config={'threads': 1})
     results = []
     
     try:
