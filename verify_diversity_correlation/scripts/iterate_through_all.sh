@@ -49,7 +49,7 @@ echo ""
 
 # Loop through each coverage value
 for COV in "${COVERAGES[@]}"; do
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/hash_diversity_results_medium_cov_${COV}"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/hash_diversity_results_full_cov_${COV}"
     
     echo ""
     echo "-----------------------------------------------------------------------"
@@ -92,7 +92,7 @@ echo ""
 if [ ${#SUCCESSFUL[@]} -gt 0 ]; then
     echo "✓ Successful coverage values:"
     for COV in "${SUCCESSFUL[@]}"; do
-        echo "    $COV → ${BASE_OUTPUT_DIR}/hash_diversity_results_medium_cov_${COV}/"
+        echo "    $COV → ${BASE_OUTPUT_DIR}/hash_diversity_results_full_cov_${COV}/"
     done
     echo ""
 fi
