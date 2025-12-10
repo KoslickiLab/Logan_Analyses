@@ -1,0 +1,33 @@
+FIX: Read Error in run_all_coverages.sh
+========================================
+
+Error:
+------
+"read: read error: 0: Bad file descriptor"
+
+Cause:
+------
+The script redirects stdout/stderr to `tee` for logging before the interactive
+`read` command runs. This breaks the `read` command's ability to read from the
+terminal (stdin).
+
+Solution:
+---------
+Changed line 44 from:
+    read -p "Continue? (y/n) " -n 1 -r
+
+To:
+    read -p "Continue? (y/n) " -n 1 -r < /dev/tty
+
+The `< /dev/tty` explicitly tells `read` to get input from the terminal device,
+even when stdin/stdout have been redirected for logging.
+
+Alternative for Non-Interactive Use:
+------------------------------------
+If you want to skip the confirmation prompt entirely (e.g., for automated runs):
+
+    yes | bash run_all_coverages.sh
+
+This pipes 'y' to the script automatically.
+
+Or edit the script to remove the confirmation section entirely (lines 44-50).

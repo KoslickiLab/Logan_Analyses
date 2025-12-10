@@ -1,0 +1,323 @@
+PARQUET FILE ANALYSIS GUIDE
+===========================
+
+The hash_diversity_data.parquet file contains all the data you need for downstream analysis.
+
+COLUMNS:
+--------
+- accession: Sample accession ID (e.g., DRR000001)
+- hashes_per_mb: Normalized k-mer hash density per megabase
+- total_distinct_hashes: Raw count of distinct k-mer hashes
+- diversity_per_mb: Normalized alpha diversity per megabase
+- alpha_diversity: Raw species count
+- mbases: Sequencing depth in megabases
+
+FILE FORMAT:
+------------
+Parquet is a columnar storage format that's:
+- Much faster to read than CSV (10-100x)
+- Smaller file size (typically 5-10x smaller)
+- Preserves data types
+- Efficient for filtering and slicing
+
+QUICK ANALYSIS EXAMPLES:
+========================
+
+1. BASIC LOADING (Python)
+--------------------------
+import pandas as pd
+
+# Load entire dataset
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Load only specific columns (faster!)
+df = pd.read_parquet('hash_diversity_data.parquet', 
+                     columns=['accession', 'hashes_per_mb', 'diversity_per_mb'])
+
+
+2. FILTERING LOW-QUALITY SAMPLES
+---------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Filter out samples with very few hashes
+# (These are the ones causing the flat "y=0" pattern you observed)
+threshold = 1000  # Adjust this based on your distribution plots
+
+df_filtered = df[df['total_distinct_hashes'] >= threshold].copy()
+
+print(f"Original samples: {len(df):,}")
+print(f"After filtering: {len(df_filtered):,}")
+print(f"Removed: {len(df) - len(df_filtered):,} ({100*(len(df)-len(df_filtered))/len(df):.1f}%)")
+
+# Recalculate correlation
+from scipy.stats import pearsonr
+r, p = pearsonr(df_filtered['hashes_per_mb'], df_filtered['diversity_per_mb'])
+print(f"\nPearson r after filtering: {r:.4f} (p={p:.2e})")
+
+
+3. EXPLORE THRESHOLDS
+----------------------
+import pandas as pd
+import numpy as np
+from scipy.stats import pearsonr
+
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Test multiple thresholds
+thresholds = [100, 500, 1000, 5000, 10000]
+
+for threshold in thresholds:
+    df_filt = df[df['total_distinct_hashes'] >= threshold]
+    r, p = pearsonr(df_filt['hashes_per_mb'], df_filt['diversity_per_mb'])
+    print(f"Threshold {threshold:>6}: n={len(df_filt):>7,} r={r:.4f} R²={r**2:.4f}")
+
+
+4. IDENTIFY THE TWO POPULATIONS
+--------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Classify samples into "low hash" and "normal hash" groups
+# Adjust threshold based on your distribution
+low_hash_threshold = 500
+
+df['sample_type'] = df['total_distinct_hashes'].apply(
+    lambda x: 'low_hash' if x < low_hash_threshold else 'normal_hash'
+)
+
+print("Sample distribution:")
+print(df['sample_type'].value_counts())
+
+# Plot the two groups separately
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+for sample_type, ax in zip(['low_hash', 'normal_hash'], axes):
+    subset = df[df['sample_type'] == sample_type]
+    ax.scatter(subset['hashes_per_mb'], subset['diversity_per_mb'], 
+               alpha=0.3, s=10)
+    ax.set_title(f'{sample_type} (n={len(subset):,})')
+    ax.set_xlabel('Hashes per Mb')
+    ax.set_ylabel('Diversity per Mb')
+
+plt.tight_layout()
+plt.savefig('two_populations.png', dpi=300)
+
+
+5. JOIN WITH METADATA
+----------------------
+import pandas as pd
+import duckdb
+
+# Load your data
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Connect to metadata database
+conn = duckdb.connect('/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined.duckdb', 
+                      read_only=True)
+
+# Get accessions as a list
+accessions = df['accession'].tolist()
+
+# Query metadata (adjust columns as needed)
+query = f"""
+SELECT 
+    acc,
+    biosample,
+    organism,
+    instrument,
+    platform,
+    bioproject,
+    attributes
+FROM metadata_geo_joined 
+WHERE acc IN ({','.join([f"'{a}'" for a in accessions])})
+"""
+
+metadata = conn.execute(query).fetchdf()
+conn.close()
+
+# Merge
+df_merged = df.merge(metadata, left_on='accession', right_on='acc', how='left')
+
+# Now you can analyze by platform, organism, etc.
+print("Samples by platform:")
+print(df_merged['platform'].value_counts())
+
+
+6. COLOR BY METADATA ATTRIBUTE
+-------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Assume df_merged from example 5
+df_merged = pd.read_parquet('merged_data.parquet')  # Save merged data first
+
+# Get top platforms
+top_platforms = df_merged['platform'].value_counts().head(5).index
+
+# Plot with colors
+fig, ax = plt.subplots(figsize=(12, 8))
+
+for platform in top_platforms:
+    subset = df_merged[df_merged['platform'] == platform]
+    ax.scatter(subset['hashes_per_mb'], subset['diversity_per_mb'],
+               alpha=0.5, s=20, label=f"{platform} (n={len(subset):,})")
+
+ax.set_xlabel('Hashes per Mb')
+ax.set_ylabel('Diversity per Mb')
+ax.legend()
+plt.tight_layout()
+plt.savefig('correlation_by_platform.png', dpi=300)
+
+
+7. PARSE ATTRIBUTES JSON
+-------------------------
+import pandas as pd
+import json
+
+df_merged = pd.read_parquet('merged_data.parquet')
+
+# Parse the attributes JSON column to extract biome/environment info
+def extract_biome(attributes_json):
+    try:
+        attrs = json.loads(attributes_json) if isinstance(attributes_json, str) else attributes_json
+        # Look for common biome-related fields
+        for attr in attrs:
+            if 'env_biome' in attr.get('tag', '').lower():
+                return attr.get('value', 'unknown')
+            if 'environment' in attr.get('tag', '').lower():
+                return attr.get('value', 'unknown')
+        return 'unknown'
+    except:
+        return 'unknown'
+
+df_merged['biome'] = df_merged['attributes'].apply(extract_biome)
+
+print("Samples by biome:")
+print(df_merged['biome'].value_counts())
+
+
+8. STATISTICAL TESTS BY GROUP
+------------------------------
+import pandas as pd
+from scipy.stats import mannwhitneyu
+
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Define groups
+low_hash = df[df['total_distinct_hashes'] < 1000]
+high_hash = df[df['total_distinct_hashes'] >= 1000]
+
+# Compare diversity between groups
+stat, p = mannwhitneyu(low_hash['alpha_diversity'], 
+                       high_hash['alpha_diversity'])
+
+print(f"Mann-Whitney U test:")
+print(f"  Low hash group: median diversity = {low_hash['alpha_diversity'].median():.1f}")
+print(f"  High hash group: median diversity = {high_hash['alpha_diversity'].median():.1f}")
+print(f"  p-value = {p:.2e}")
+
+
+9. EXPORT FILTERED DATA FOR R
+------------------------------
+import pandas as pd
+
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Apply your filters
+df_filtered = df[df['total_distinct_hashes'] >= 1000]
+
+# Save as CSV for R
+df_filtered.to_csv('filtered_for_R.csv', index=False)
+
+# Or keep as parquet (R can read parquet with arrow package)
+df_filtered.to_parquet('filtered_for_R.parquet', index=False)
+
+
+10. COMPARE ACROSS COVERAGE THRESHOLDS
+---------------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+
+coverages = [0.0, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
+results = []
+
+for cov in coverages:
+    file = f'hash_diversity_results_full_cov_{cov}/data/hash_diversity_data.parquet'
+    df = pd.read_parquet(file)
+    
+    # Apply filter
+    df_filt = df[df['total_distinct_hashes'] >= 1000]
+    
+    from scipy.stats import pearsonr
+    r, p = pearsonr(df_filt['hashes_per_mb'], df_filt['diversity_per_mb'])
+    
+    results.append({
+        'coverage': cov,
+        'n_samples': len(df_filt),
+        'pearson_r': r,
+        'r_squared': r**2
+    })
+
+results_df = pd.DataFrame(results)
+print(results_df)
+
+# Plot correlation strength vs coverage
+plt.figure(figsize=(10, 6))
+plt.plot(results_df['coverage'], results_df['pearson_r'], 'o-', linewidth=2)
+plt.xlabel('Coverage threshold')
+plt.ylabel('Pearson r')
+plt.title('Correlation strength vs coverage threshold')
+plt.grid(True, alpha=0.3)
+plt.savefig('correlation_vs_coverage.png', dpi=300)
+
+
+HELPER SCRIPT:
+==============
+A helper script is provided for common analyses:
+
+python3 analyze_parquet_data.py \
+    --input hash_diversity_data.parquet \
+    --output filtered_analysis \
+    --min-hashes 1000 \
+    --min-diversity 5 \
+    --join-metadata
+
+This will:
+- Filter samples by quality thresholds
+- Join with metadata database
+- Create new correlation plots
+- Color plots by platform
+- Save filtered parquet file
+
+
+PERFORMANCE TIPS:
+=================
+1. Load only needed columns for speed:
+   df = pd.read_parquet(file, columns=['accession', 'hashes_per_mb'])
+
+2. Use filters when loading (if using pyarrow):
+   import pyarrow.parquet as pq
+   table = pq.read_table(file, filters=[('total_distinct_hashes', '>=', 1000)])
+   df = table.to_pandas()
+
+3. For very large files, process in chunks or use Dask/Polars
+
+4. Parquet preserves data types, so no need for dtype conversions
+
+
+NEXT STEPS:
+===========
+1. Examine distribution plots to identify good thresholds
+2. Filter out low-quality samples (low hash count)
+3. Re-plot to see if correlation strengthens
+4. Join with metadata to identify enriched characteristics in low-quality samples
+5. Color scatter plots by biome/platform/organism
+6. Run statistical tests comparing groups

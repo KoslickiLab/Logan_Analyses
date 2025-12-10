@@ -1,0 +1,182 @@
+PARQUET OUTPUT AND LOG SCALE UPDATES
+====================================
+
+Summary of Changes:
+-------------------
+
+1. LOG SCALE DISTRIBUTIONS
+   - "Distribution of Total Hashes" subplot now uses log scale on y-axis
+   - "Distribution of Alpha Diversity" subplot now uses log scale on y-axis
+   - This helps visualize the bimodal distribution you observed
+
+2. PARQUET FILE OUTPUT
+   - New file: hash_diversity_data.parquet in the data/ directory
+   - Columns included:
+     * accession - Sample accession ID
+     * hashes_per_mb - Normalized k-mer hash density
+     * total_distinct_hashes - Raw hash count
+     * diversity_per_mb - Normalized alpha diversity
+     * alpha_diversity - Raw species count
+     * mbases - Sequencing depth (for reference)
+   
+   - Benefits:
+     * 10-100x faster to read than CSV
+     * 5-10x smaller file size
+     * Preserves data types
+     * Perfect for filtering and slicing
+
+3. NEW HELPER SCRIPT
+   - analyze_parquet_data.py - Ready-to-use script for downstream analysis
+   - Features:
+     * Apply quality filters (min hashes, min diversity)
+     * Join with metadata database
+     * Create filtered correlation plots
+     * Color plots by platform/metadata
+     * Save filtered parquet files
+
+4. COMPREHENSIVE GUIDE
+   - PARQUET_ANALYSIS_GUIDE.txt - 10+ examples for common analyses
+   - Includes code for:
+     * Filtering low-quality samples
+     * Testing multiple thresholds
+     * Identifying the two populations
+     * Joining with metadata
+     * Coloring by biome/platform
+     * Comparing across coverage thresholds
+
+
+Your Observation About Two Populations:
+---------------------------------------
+You correctly identified that the scatter plots show two distinct patterns:
+
+1. **Low-hash samples** (flat line at y≈0):
+   - Very few distinct k-mer hashes
+   - Near-zero alpha diversity
+   - These are likely failed samples, contamination, or very low complexity
+
+2. **Normal samples** (positive correlation):
+   - Good hash counts
+   - Show expected positive correlation
+   - These are your high-quality samples
+
+The log-scale histograms will help you identify the threshold to separate these populations.
+
+
+Recommended Workflow:
+--------------------
+
+STEP 1: Examine distributions (now with log scale)
+→ Identify threshold where "low-hash" population ends
+→ Common thresholds to try: 500, 1000, 5000 hashes
+
+STEP 2: Filter and re-analyze
+```bash
+python3 analyze_parquet_data.py \
+    --input hash_diversity_results_full_cov_0.0625/data/hash_diversity_data.parquet \
+    --output filtered_min1000 \
+    --min-hashes 1000 \
+    --min-diversity 1
+```
+
+STEP 3: Join with metadata
+```bash
+python3 analyze_parquet_data.py \
+    --input hash_diversity_results_full_cov_0.0625/data/hash_diversity_data.parquet \
+    --output filtered_with_metadata \
+    --min-hashes 1000 \
+    --join-metadata
+```
+
+STEP 4: Investigate low-quality samples
+```python
+import pandas as pd
+
+# Load all data
+df = pd.read_parquet('hash_diversity_data.parquet')
+
+# Identify low-quality samples
+low_quality = df[df['total_distinct_hashes'] < 1000]
+
+# Save accessions for metadata lookup
+low_quality[['accession']].to_csv('low_quality_accessions.txt', 
+                                  index=False, header=False)
+
+# Join with metadata to find patterns
+# (e.g., specific platform, biome, instrument)
+```
+
+STEP 5: Compare across coverage thresholds
+→ See if optimal threshold changes with coverage
+→ Determine which coverage gives best signal
+
+
+Quick Analysis Commands:
+------------------------
+
+# Load and explore
+python3
+>>> import pandas as pd
+>>> df = pd.read_parquet('hash_diversity_data.parquet')
+>>> df.describe()
+>>> df['total_distinct_hashes'].hist(bins=100)
+
+# Test different thresholds
+>>> for thresh in [500, 1000, 5000]:
+...     n = (df['total_distinct_hashes'] >= thresh).sum()
+...     print(f"Threshold {thresh}: {n:,} samples ({100*n/len(df):.1f}%)")
+
+# Quick filter and recalculate correlation
+>>> df_filt = df[df['total_distinct_hashes'] >= 1000]
+>>> from scipy.stats import pearsonr
+>>> r, p = pearsonr(df_filt['hashes_per_mb'], df_filt['diversity_per_mb'])
+>>> print(f"r={r:.4f}, R²={r**2:.4f}")
+
+
+Expected Results After Filtering:
+---------------------------------
+Based on your plots, filtering out low-hash samples should:
+
+✓ Remove the "flat line" at y≈0
+✓ Strengthen the correlation (higher r and R²)
+✓ Reduce scatter in the main cloud
+✓ Show clearer biological signal
+
+You might see:
+- Original: r ≈ 0.55, R² ≈ 0.30
+- After filtering: r ≈ 0.65-0.75, R² ≈ 0.42-0.56 (estimated)
+
+
+Technical Notes:
+----------------
+- Parquet requires pyarrow (added to requirements.txt)
+- Install with: pip install pyarrow
+- Already installed on most systems with pandas>=2.0
+- The helper script uses same DuckDB read-only pattern
+
+
+Files Updated:
+--------------
+1. hash_diversity_correlation.py
+   - Added log scales to distribution plots
+   - Added parquet file output
+   - Added pyarrow note to imports
+
+2. requirements.txt
+   - Added pyarrow>=14.0.0
+
+3. New files:
+   - analyze_parquet_data.py (helper script)
+   - PARQUET_ANALYSIS_GUIDE.txt (examples and documentation)
+
+
+Next Run:
+---------
+When you run your full analysis across all coverage thresholds:
+
+1. Each coverage will produce its own parquet file
+2. Use log-scale distributions to identify thresholds
+3. Filter and compare correlation strength across coverages
+4. Identify which coverage + threshold gives best signal
+5. Investigate metadata patterns in low-quality samples
+
+The parquet files make this downstream analysis much faster and more flexible!
