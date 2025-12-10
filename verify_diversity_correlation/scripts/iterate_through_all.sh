@@ -35,16 +35,11 @@ echo "ESTIMATED RUNTIME:"
 echo "  Per coverage: ~4-8 hours (depends on sample count and database speed)"
 echo "  Total: ~32-64 hours for all 8 coverage values"
 echo ""
-echo "This will create ${#COVERAGES[@]} output directories in:"
+echo "Output directories will be created in:"
 echo "  $BASE_OUTPUT_DIR/"
 echo "======================================================================="
 echo ""
-read -p "Continue? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled."
-    exit 0
-fi
+echo "Starting analysis..."
 echo ""
 
 # Loop through each coverage value
