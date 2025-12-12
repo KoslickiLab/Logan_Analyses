@@ -114,6 +114,7 @@ def get_wgs_samples(config: Config) -> pd.DataFrame:
     WHERE assay_type = 'WGS' 
         AND libraryselection = 'RANDOM' 
         AND mbases > {config.min_mbases}
+        AND ((organism ILIKE '%metageno%') OR (librarysource in ('METAGENOMIC', 'METATRANSCRIPTOMIC')))
     ORDER BY acc
     """
     
