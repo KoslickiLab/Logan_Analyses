@@ -20,6 +20,7 @@ Path(OUTPUT_DIR).mkdir(exist_ok=True)
 # Connect to database
 print(f"Connecting to database: {DB_PATH}")
 con = duckdb.connect(DB_PATH, read_only=True)
+con.execute("SET threads TO 200")
 
 # Define the filter condition for samples
 SAMPLE_FILTER = """
