@@ -40,17 +40,30 @@ def load_parquet_data(parquet_file: Path) -> pd.DataFrame:
     print(f"Columns: {df.columns.tolist()}")
     return df
 
-def apply_filters(df: pd.DataFrame, min_hashes: int = 1000, min_diversity: int = 1) -> pd.DataFrame:
+def apply_filters(df: pd.DataFrame, min_hashes: int = 1000, min_diversity: int = 1, 
+                  min_mbases: int = 0) -> pd.DataFrame:
     """Apply quality filters to the data."""
     print(f"\nApplying filters:")
     print(f"  Minimum total hashes: {min_hashes:,}")
     print(f"  Minimum alpha diversity: {min_diversity}")
+    if min_mbases > 0:
+        print(f"  Minimum mbases: {min_mbases:,}")
     
     original_count = len(df)
-    df_filtered = df[
+    
+    # Build filter conditions
+    filter_mask = (
         (df['total_distinct_hashes'] >= min_hashes) &
         (df['alpha_diversity'] >= min_diversity)
-    ].copy()
+    )
+    
+    # Add mbases filter if column exists and threshold > 0
+    if min_mbases > 0 and 'mbases' in df.columns:
+        filter_mask = filter_mask & (df['mbases'] >= min_mbases)
+    elif min_mbases > 0 and 'mbases' not in df.columns:
+        print(f"  WARNING: mbases column not found, skipping mbases filter")
+    
+    df_filtered = df[filter_mask].copy()
     
     filtered_count = len(df_filtered)
     print(f"\nFiltering results:")
@@ -1142,6 +1155,8 @@ def main():
                        help='Minimum total distinct hashes')
     parser.add_argument('--min-diversity', type=int, default=1,
                        help='Minimum alpha diversity')
+    parser.add_argument('--min-mbases', type=int, default=0,
+                       help='Minimum sequencing depth in megabases (0 = no filter)')
     parser.add_argument('--metadata-db', 
                        default='/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined.duckdb',
                        help='Path to metadata database')
@@ -1162,22 +1177,25 @@ def main():
     df = load_parquet_data(Path(args.input))
     
     # Apply filters
-    df_filtered = apply_filters(df, args.min_hashes, args.min_diversity)
+    df_filtered = apply_filters(df, args.min_hashes, args.min_diversity, args.min_mbases)
     
     # Join metadata if requested
     if args.join_metadata:
         df_filtered = join_metadata(df_filtered, args.metadata_db)
     
     # Create plots
-    stats = plot_filtered_correlation(df_filtered, output_dir, 
-                                     label=f"min{args.min_hashes}hashes")
+    label_parts = [f"min{args.min_hashes}hashes"]
+    if args.min_mbases > 0:
+        label_parts.append(f"min{args.min_mbases}mbases")
+    label = "_".join(label_parts)
+    stats = plot_filtered_correlation(df_filtered, output_dir, label=label)
     
     if args.join_metadata:
         # Prepare filter info for report
         filters_applied = {
             'min_hashes': args.min_hashes,
             'min_diversity': args.min_diversity,
-            'min_mbases': 100,
+            'min_mbases': args.min_mbases,
             'n_samples_after_filtering': len(df_filtered),
             'input_file': args.input
         }
