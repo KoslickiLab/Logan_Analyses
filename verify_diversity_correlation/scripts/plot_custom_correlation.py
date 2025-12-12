@@ -240,7 +240,30 @@ def create_plot(df: pd.DataFrame, metrics: dict, output_dir: Path,
         value_counts = df[cat_col].value_counts()
         categories = value_counts.index.tolist()  # Already sorted by frequency
         
-        colors = sns.color_palette("tab20", n_colors=min(20, len(categories)))
+        # Use maximally distinguishable colors
+        # Combine multiple palettes to ensure distinct colors (no similar blues, etc.)
+        distinct_colors = [
+            '#e41a1c',  # red
+            '#ff7f00',  # orange
+            '#4daf4a',  # green
+            '#984ea3',  # purple
+            '#f781bf',  # pink
+            '#a65628',  # brown
+            '#ffff33',  # yellow
+            '#377eb8',  # blue (only one blue)
+            '#999999',  # gray
+            '#e41a1c',  # cycling back with different saturation
+            '#66c2a5',  # teal (only one teal-ish color)
+            '#fc8d62',  # light orange
+            '#8da0cb',  # light purple
+            '#e78ac3',  # light pink
+            '#a6d854',  # lime
+            '#ffd92f',  # gold
+            '#e5c494',  # tan
+            '#b3b3b3',  # light gray
+            '#8dd3c7',  # cyan
+            '#bebada',  # lavender
+        ]
         
         # Plot in order of frequency (most frequent first)
         # This ensures less frequent points are plotted on top
@@ -253,9 +276,9 @@ def create_plot(df: pd.DataFrame, metrics: dict, output_dir: Path,
             ax.scatter(
                 cat_data['hashes_per_mb'],
                 cat_data['diversity_per_mb'],
-                alpha=0.5,
-                s=25,
-                color=colors[idx % len(colors)],
+                alpha=0.6,
+                s=8,  # Smaller points to reduce overlap
+                color=distinct_colors[idx % len(distinct_colors)],
                 label=label,
                 edgecolors='none',
                 rasterized=True
@@ -268,8 +291,8 @@ def create_plot(df: pd.DataFrame, metrics: dict, output_dir: Path,
         # Single color
         ax.scatter(
             x, y,
-            alpha=0.4,
-            s=25,
+            alpha=0.5,
+            s=8,  # Smaller points to reduce overlap
             c='steelblue',
             edgecolors='none',
             rasterized=True
