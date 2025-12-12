@@ -34,11 +34,26 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr, spearmanr, kendalltau
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
+
+# Import optional correlation libraries
+try:
+    import dcor
+    HAS_DCOR = True
+except ImportError:
+    HAS_DCOR = False
+    print("Note: dcor not installed - distance correlation will be skipped")
+
+try:
+    from minepy import MINE
+    HAS_MINE = True
+except ImportError:
+    HAS_MINE = False
+    print("Note: minepy not installed - MIC will be skipped")
 
 # Note: pandas.to_parquet() will use pyarrow or fastparquet if available
 # If not installed, will raise an error with instructions
@@ -320,13 +335,37 @@ def perform_correlation_analysis(df: pd.DataFrame, config: Config) -> Dict:
     
     print(f"Analyzing {n_samples:,} samples with complete data")
     
+    # Get data arrays
+    x = df_clean['hashes_per_mb'].values
+    y = df_clean['diversity_per_mb'].values
+    
     # Calculate correlations
-    pearson_r, pearson_p = pearsonr(df_clean['hashes_per_mb'], df_clean['diversity_per_mb'])
-    spearman_r, spearman_p = spearmanr(df_clean['hashes_per_mb'], df_clean['diversity_per_mb'])
+    pearson_r, pearson_p = pearsonr(x, y)
+    spearman_r, spearman_p = spearmanr(x, y)
+    kendall_tau, kendall_p = kendalltau(x, y)
+    
+    # Distance correlation (non-linear dependencies)
+    if HAS_DCOR:
+        try:
+            distance_corr = dcor.distance_correlation(x, y)
+        except:
+            distance_corr = np.nan
+    else:
+        distance_corr = np.nan
+    
+    # Maximal Information Coefficient (non-linear associations)
+    if HAS_MINE and n_samples >= 50:
+        try:
+            mine = MINE(alpha=0.6, c=15)
+            mine.compute_score(x, y)
+            mic_score = mine.mic()
+        except:
+            mic_score = np.nan
+    else:
+        mic_score = np.nan
     
     # Fit linear regression
-    X = df_clean['hashes_per_mb'].values.reshape(-1, 1)
-    y = df_clean['diversity_per_mb'].values
+    X = x.reshape(-1, 1)
     
     model = LinearRegression()
     model.fit(X, y)
@@ -342,18 +381,30 @@ def perform_correlation_analysis(df: pd.DataFrame, config: Config) -> Dict:
         'pearson_p': pearson_p,
         'spearman_r': spearman_r,
         'spearman_p': spearman_p,
+        'kendall_tau': kendall_tau,
+        'kendall_p': kendall_p,
+        'distance_corr': distance_corr,
+        'mic': mic_score,
         'r2': r2,
         'slope': slope,
         'intercept': intercept,
     }
     
     print(f"\nCorrelation Results:")
-    print(f"  Pearson r:  {pearson_r:.4f} (p={pearson_p:.2e})")
-    print(f"  Spearman ρ: {spearman_r:.4f} (p={spearman_p:.2e})")
-    print(f"  R²:         {r2:.4f}")
+    print(f"  Linear:")
+    print(f"    Pearson r:  {pearson_r:.4f} (p={pearson_p:.2e})")
+    print(f"    R²:         {r2:.4f}")
+    print(f"  Monotonic:")
+    print(f"    Spearman ρ: {spearman_r:.4f} (p={spearman_p:.2e})")
+    print(f"    Kendall τ:  {kendall_tau:.4f} (p={kendall_p:.2e})")
+    if not np.isnan(distance_corr):
+        print(f"  Non-linear:")
+        print(f"    Distance corr: {distance_corr:.4f}")
+    if not np.isnan(mic_score):
+        print(f"    MIC:           {mic_score:.4f}")
     print(f"  Regression: y = {slope:.6f}x + {intercept:.6f}")
     
-    # Interpret results
+    # Interpret results (using Spearman as primary for monotonic relationships)
     print(f"\nInterpretation:")
     if pearson_p < 0.001:
         sig_str = "highly significant (p < 0.001)"
@@ -364,19 +415,29 @@ def perform_correlation_analysis(df: pd.DataFrame, config: Config) -> Dict:
     else:
         sig_str = "not significant (p >= 0.05)"
     
-    if abs(pearson_r) > 0.7:
+    # Use Spearman for strength assessment (better for monotonic relationships)
+    if abs(spearman_r) > 0.7:
         strength = "strong"
-    elif abs(pearson_r) > 0.4:
+    elif abs(spearman_r) > 0.4:
         strength = "moderate"
-    elif abs(pearson_r) > 0.2:
+    elif abs(spearman_r) > 0.2:
         strength = "weak"
     else:
         strength = "very weak"
     
-    direction = "positive" if pearson_r > 0 else "negative"
+    direction = "positive" if spearman_r > 0 else "negative"
     
-    print(f"  The correlation is {strength} and {direction}, and {sig_str}")
-    print(f"  {r2*100:.1f}% of variance in diversity per Mb is explained by hashes per Mb")
+    print(f"  The monotonic correlation is {strength} and {direction}, and {sig_str}")
+    print(f"  {r2*100:.1f}% of variance in diversity per Mb is explained by linear regression")
+    
+    # Compare Spearman vs Pearson
+    if abs(spearman_r - pearson_r) > 0.1:
+        if spearman_r > pearson_r:
+            print(f"  Note: Spearman ρ ({spearman_r:.3f}) > Pearson r ({pearson_r:.3f})")
+            print(f"        Suggests monotonic but non-linear relationship (e.g., diminishing returns)")
+        else:
+            print(f"  Note: Pearson r ({pearson_r:.3f}) > Spearman ρ ({spearman_r:.3f})")
+            print(f"        Unusual pattern - may warrant further investigation")
     
     return results
 
@@ -423,22 +484,29 @@ def create_visualizations(df: pd.DataFrame, results: Dict, config: Config):
                  f'in WGS Metagenomic Samples (coverage ≥ {config.coverage})',
                  fontsize=16, fontweight='bold', pad=20)
     
-    # Add statistics box
-    stats_text = (
-        f'n = {results["n_samples"]:,}\n'
-        f'Pearson r = {results["pearson_r"]:.4f}\n'
-        f'p-value = {results["pearson_p"]:.2e}\n'
-        f'R² = {results["r2"]:.4f}\n'
-        f'Spearman ρ = {results["spearman_r"]:.4f}'
-    )
+    # Add statistics box with all metrics
+    stats_text = f'n = {results["n_samples"]:,}\n\n'
+    stats_text += 'Linear:\n'
+    stats_text += f'  Pearson r = {results["pearson_r"]:.4f}\n'
+    stats_text += f'  R² = {results["r2"]:.4f}\n'
+    stats_text += f'  p = {results["pearson_p"]:.2e}\n\n'
+    stats_text += 'Monotonic:\n'
+    stats_text += f'  Spearman ρ = {results["spearman_r"]:.4f}\n'
+    stats_text += f'  Kendall τ = {results["kendall_tau"]:.4f}\n\n'
+    stats_text += 'Non-linear:\n'
+    if not np.isnan(results.get('distance_corr', np.nan)):
+        stats_text += f'  Distance corr = {results["distance_corr"]:.4f}\n'
+    if not np.isnan(results.get('mic', np.nan)):
+        stats_text += f'  MIC = {results["mic"]:.4f}'
     
     # Position stats box in upper left
     ax.text(
         0.05, 0.95, stats_text,
         transform=ax.transAxes,
-        fontsize=12,
+        fontsize=11,
         verticalalignment='top',
-        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+        family='monospace'
     )
     
     # Add legend for regression line
@@ -607,36 +675,50 @@ def generate_report(df: pd.DataFrame, results: Dict, config: Config):
         
         f.write("-"*70 + "\n")
         f.write("CORRELATION ANALYSIS\n")
-        f.write("-"*70 + "\n")
-        f.write(f"Pearson correlation coefficient: r = {results['pearson_r']:.6f}\n")
-        f.write(f"  p-value: {results['pearson_p']:.4e}\n")
-        f.write(f"  Significance: {'***' if results['pearson_p'] < 0.001 else '**' if results['pearson_p'] < 0.01 else '*' if results['pearson_p'] < 0.05 else 'ns'}\n\n")
+        f.write("-"*70 + "\n\n")
         
-        f.write(f"Spearman correlation coefficient: ρ = {results['spearman_r']:.6f}\n")
-        f.write(f"  p-value: {results['spearman_p']:.4e}\n")
-        f.write(f"  Significance: {'***' if results['spearman_p'] < 0.001 else '**' if results['spearman_p'] < 0.01 else '*' if results['spearman_p'] < 0.05 else 'ns'}\n\n")
-        
-        f.write(f"Linear Regression:\n")
+        f.write("Linear Correlations:\n")
+        f.write(f"  Pearson correlation coefficient: r = {results['pearson_r']:.6f}\n")
+        f.write(f"    p-value: {results['pearson_p']:.4e}\n")
+        f.write(f"    Significance: {'***' if results['pearson_p'] < 0.001 else '**' if results['pearson_p'] < 0.01 else '*' if results['pearson_p'] < 0.05 else 'ns'}\n")
         f.write(f"  R² (coefficient of determination): {results['r2']:.6f}\n")
-        f.write(f"  Equation: diversity_per_mb = {results['slope']:.8f} × hashes_per_mb + {results['intercept']:.8f}\n")
-        f.write(f"  Variance explained: {results['r2']*100:.2f}%\n\n")
+        f.write(f"    Variance explained: {results['r2']*100:.2f}%\n")
+        f.write(f"  Regression equation: diversity_per_mb = {results['slope']:.8f} × hashes_per_mb + {results['intercept']:.8f}\n\n")
+        
+        f.write("Monotonic Correlations (Rank-based):\n")
+        f.write(f"  Spearman correlation coefficient: ρ = {results['spearman_r']:.6f}\n")
+        f.write(f"    p-value: {results['spearman_p']:.4e}\n")
+        f.write(f"    Significance: {'***' if results['spearman_p'] < 0.001 else '**' if results['spearman_p'] < 0.01 else '*' if results['spearman_p'] < 0.05 else 'ns'}\n")
+        f.write(f"  Kendall's tau: τ = {results['kendall_tau']:.6f}\n")
+        f.write(f"    p-value: {results['kendall_p']:.4e}\n")
+        f.write(f"    Significance: {'***' if results['kendall_p'] < 0.001 else '**' if results['kendall_p'] < 0.01 else '*' if results['kendall_p'] < 0.05 else 'ns'}\n\n")
+        
+        if not np.isnan(results.get('distance_corr', np.nan)) or not np.isnan(results.get('mic', np.nan)):
+            f.write("Non-linear Dependencies:\n")
+            if not np.isnan(results.get('distance_corr', np.nan)):
+                f.write(f"  Distance correlation: {results['distance_corr']:.6f}\n")
+                f.write(f"    (0 = independent, 1 = dependent)\n")
+            if not np.isnan(results.get('mic', np.nan)):
+                f.write(f"  Maximal Information Coefficient (MIC): {results['mic']:.6f}\n")
+                f.write(f"    (detects various functional relationships)\n")
+            f.write("\n")
         
         f.write("-"*70 + "\n")
         f.write("INTERPRETATION\n")
-        f.write("-"*70 + "\n")
+        f.write("-"*70 + "\n\n")
         
-        # Determine strength
-        r = abs(results['pearson_r'])
-        if r > 0.7:
+        # Use Spearman for strength assessment (better for monotonic relationships)
+        spearman_r = abs(results['spearman_r'])
+        if spearman_r > 0.7:
             strength = "strong"
-        elif r > 0.4:
+        elif spearman_r > 0.4:
             strength = "moderate"
-        elif r > 0.2:
+        elif spearman_r > 0.2:
             strength = "weak"
         else:
             strength = "very weak"
         
-        direction = "positive" if results['pearson_r'] > 0 else "negative"
+        direction = "positive" if results['spearman_r'] > 0 else "negative"
         
         if results['pearson_p'] < 0.001:
             significance = "highly statistically significant (p < 0.001)"
@@ -647,8 +729,27 @@ def generate_report(df: pd.DataFrame, results: Dict, config: Config):
         else:
             significance = "not statistically significant (p ≥ 0.05)"
         
-        f.write(f"The hypothesis that distinct hashes per basepair correlates with alpha diversity\n")
-        f.write(f"shows a {strength} {direction} correlation that is {significance}.\n\n")
+        f.write(f"The hypothesis that more distinct hashes predicts higher alpha diversity\n")
+        f.write(f"shows a {strength} {direction} monotonic relationship that is {significance}.\n\n")
+        
+        # Compare Spearman vs Pearson
+        if abs(results['spearman_r'] - results['pearson_r']) > 0.1:
+            if results['spearman_r'] > results['pearson_r']:
+                f.write(f"Note: Spearman ρ ({results['spearman_r']:.3f}) exceeds Pearson r ({results['pearson_r']:.3f}),\n")
+                f.write(f"suggesting the relationship is monotonic but non-linear (e.g., diminishing returns).\n")
+                f.write(f"More hashes consistently predict more diversity, but the relationship may curve.\n\n")
+            else:
+                f.write(f"Note: Pearson r ({results['pearson_r']:.3f}) exceeds Spearman ρ ({results['spearman_r']:.3f}),\n")
+                f.write(f"which is unusual and may warrant further investigation.\n\n")
+        
+        f.write(f"Key Findings:\n")
+        f.write(f"- {results['r2']*100:.1f}% of variance in diversity per Mb is explained by linear regression\n")
+        f.write(f"- The monotonic correlation (Spearman ρ = {results['spearman_r']:.3f}) indicates that\n")
+        f.write(f"  larger numbers of distinct hashes {'consistently' if results['spearman_r'] > 0.5 else 'modestly'} predict {'higher' if results['spearman_r'] > 0 else 'lower'} diversity\n")
+        if not np.isnan(results.get('distance_corr', np.nan)):
+            if results['distance_corr'] > abs(results['pearson_r']) + 0.1:
+                f.write(f"- Distance correlation ({results['distance_corr']:.3f}) exceeds Pearson r,\n")
+                f.write(f"  suggesting non-linear dependencies are present\n")
         
         f.write(f"The R² value of {results['r2']:.4f} indicates that {results['r2']*100:.2f}% of the variance\n")
         f.write(f"in normalized alpha diversity can be explained by the normalized hash count.\n\n")
