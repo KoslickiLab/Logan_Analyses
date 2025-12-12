@@ -16,13 +16,15 @@ Examples:
     python3 plot_custom_correlation.py \\
         --input hash_diversity_data.parquet \\
         --output soil_jgi_analysis \\
+        --base-name soil_jgi \\
         --filter "organism=soil metagenome" \\
         --filter "center_name=JGI"
     
     # Same but colored by release year
     python3 plot_custom_correlation.py \\
         --input hash_diversity_data.parquet \\
-        --output soil_jgi_by_year \\
+        --output soil_jgi_analysis \\
+        --base-name soil_jgi_by_year \\
         --filter "organism=soil metagenome" \\
         --filter "center_name=JGI" \\
         --color-by releasedate_binned
@@ -31,13 +33,14 @@ Examples:
     python3 plot_custom_correlation.py \\
         --input filtered_data.parquet \\
         --output platform_comparison \\
+        --base-name illumina_paired \\
         --filter "platform=ILLUMINA" \\
         --filter "librarylayout=PAIRED" \\
         --color-by organism \\
         --top-n 8
 
 Usage:
-    python3 plot_custom_correlation.py --input FILE --output DIR [OPTIONS]
+    python3 plot_custom_correlation.py --input FILE --output DIR [--base-name NAME] [OPTIONS]
 """
 
 import argparse
@@ -217,7 +220,8 @@ def calculate_metrics(x: np.ndarray, y: np.ndarray) -> dict:
 
 
 def create_plot(df: pd.DataFrame, metrics: dict, output_dir: Path, 
-                color_by: str = None, filters_applied: list = None):
+                base_name: str = 'custom', color_by: str = None, 
+                filters_applied: list = None):
     """
     Create scatter plot with optional categorical coloring.
     
@@ -355,24 +359,25 @@ def create_plot(df: pd.DataFrame, metrics: dict, output_dir: Path,
     plt.tight_layout()
     
     # Save
-    plot_file = output_dir / "custom_correlation.png"
+    plot_file = output_dir / f"{base_name}_correlation.png"
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     plt.close()
     
     print(f"\nSaved plot to: {plot_file}")
 
 
-def save_metrics(metrics: dict, output_dir: Path, filters_applied: list = None):
+def save_metrics(metrics: dict, output_dir: Path, base_name: str = 'custom',
+                 filters_applied: list = None):
     """Save metrics to CSV and text files."""
     
     # CSV
-    csv_file = output_dir / "correlation_metrics.csv"
+    csv_file = output_dir / f"{base_name}_metrics.csv"
     metrics_df = pd.DataFrame([metrics])
     metrics_df.to_csv(csv_file, index=False)
     print(f"Saved metrics to: {csv_file}")
     
     # Text report
-    txt_file = output_dir / "correlation_report.txt"
+    txt_file = output_dir / f"{base_name}_report.txt"
     with open(txt_file, 'w') as f:
         f.write("="*70 + "\n")
         f.write("CUSTOM CORRELATION ANALYSIS REPORT\n")
@@ -457,6 +462,11 @@ def main():
         '--output', '-o',
         required=True,
         help='Output directory'
+    )
+    parser.add_argument(
+        '--base-name', '-b',
+        default='custom',
+        help='Base name for output files (default: custom)'
     )
     parser.add_argument(
         '--filter', '-f',
@@ -561,13 +571,13 @@ def main():
     
     # Create plot
     print("\nGenerating plot...")
-    create_plot(df_clean, metrics, output_dir, args.color_by, filters)
+    create_plot(df_clean, metrics, output_dir, args.base_name, args.color_by, filters)
     
     # Save metrics
-    save_metrics(metrics, output_dir, filters)
+    save_metrics(metrics, output_dir, args.base_name, filters)
     
     # Save filtered data
-    data_file = output_dir / "filtered_data.parquet"
+    data_file = output_dir / f"{args.base_name}_data.parquet"
     df_clean.to_parquet(data_file, index=False)
     print(f"Saved filtered data to: {data_file}")
     
@@ -575,10 +585,10 @@ def main():
     print("ANALYSIS COMPLETE")
     print("="*70)
     print(f"\nOutput files in: {output_dir}/")
-    print("  - custom_correlation.png (plot)")
-    print("  - correlation_metrics.csv (metrics)")
-    print("  - correlation_report.txt (detailed report)")
-    print("  - filtered_data.parquet (filtered data)")
+    print(f"  - {args.base_name}_correlation.png (plot)")
+    print(f"  - {args.base_name}_metrics.csv (metrics)")
+    print(f"  - {args.base_name}_report.txt (detailed report)")
+    print(f"  - {args.base_name}_data.parquet (filtered data)")
 
 
 if __name__ == "__main__":
