@@ -6,41 +6,54 @@ Generate correlation plots with flexible filtering and categorical coloring.
 
 Features:
 - Load pre-computed parquet files
-- Filter by arbitrary metadata (multiple conditions)
+- Filter by arbitrary metadata (equality, inequality, comparisons)
 - Color points by categorical variables
 - Compute all correlation metrics
 - Save publication-quality plots
+
+Filter Operators:
+- = (equals)
+- != (not equals)
+- > (greater than)
+- >= (greater than or equal)
+- < (less than)
+- <= (less than or equal)
 
 Examples:
     # Basic plot for soil metagenome samples from JGI
     python3 plot_custom_correlation.py \\
         --input hash_diversity_data.parquet \\
         --output soil_jgi_analysis \\
-        --base-name soil_jgi \\
         --filter "organism=soil metagenome" \\
         --filter "center_name=JGI"
     
-    # Same but colored by release year
+    # Filter by file size (large samples only)
     python3 plot_custom_correlation.py \\
         --input hash_diversity_data.parquet \\
-        --output soil_jgi_analysis \\
-        --base-name soil_jgi_by_year \\
-        --filter "organism=soil metagenome" \\
-        --filter "center_name=JGI" \\
-        --color-by releasedate_binned
+        --output large_samples \\
+        --filter "mbytes>1024" \\
+        --color-by platform
     
-    # Filter by multiple criteria and color by organism
+    # Filter by sequencing depth range
+    python3 plot_custom_correlation.py \\
+        --input hash_diversity_data.parquet \\
+        --output medium_depth \\
+        --filter "mbases>=100" \\
+        --filter "mbases<=1000" \\
+        --color-by organism
+    
+    # Multiple criteria with comparison operators
     python3 plot_custom_correlation.py \\
         --input filtered_data.parquet \\
-        --output platform_comparison \\
-        --base-name illumina_paired \\
+        --output high_quality \\
         --filter "platform=ILLUMINA" \\
-        --filter "librarylayout=PAIRED" \\
+        --filter "mbases>500" \\
+        --filter "alpha_diversity>10" \\
         --color-by organism \\
         --top-n 8
 
 Usage:
-    python3 plot_custom_correlation.py --input FILE --output DIR [--base-name NAME] [OPTIONS]
+    python3 plot_custom_correlation.py --input FILE --output DIR [OPTIONS]
 """
 
 import argparse
@@ -72,19 +85,40 @@ sns.set_context("paper", font_scale=1.3)
 
 def parse_filter(filter_str: str) -> tuple:
     """
-    Parse filter string in format 'column=value' or 'column!=value'.
+    Parse filter string with various operators.
+    
+    Supports:
+        column=value       (equality)
+        column!=value      (inequality)
+        column>value       (greater than)
+        column>=value      (greater than or equal)
+        column<value       (less than)
+        column<=value      (less than or equal)
     
     Returns:
         (column, operator, value)
     """
-    if '!=' in filter_str:
+    # Check operators in order of precedence (longer operators first)
+    if '>=' in filter_str:
+        column, value = filter_str.split('>=', 1)
+        return column.strip(), '>=', value.strip()
+    elif '<=' in filter_str:
+        column, value = filter_str.split('<=', 1)
+        return column.strip(), '<=', value.strip()
+    elif '!=' in filter_str:
         column, value = filter_str.split('!=', 1)
         return column.strip(), '!=', value.strip()
+    elif '>' in filter_str:
+        column, value = filter_str.split('>', 1)
+        return column.strip(), '>', value.strip()
+    elif '<' in filter_str:
+        column, value = filter_str.split('<', 1)
+        return column.strip(), '<', value.strip()
     elif '=' in filter_str:
         column, value = filter_str.split('=', 1)
         return column.strip(), '=', value.strip()
     else:
-        raise ValueError(f"Invalid filter format: {filter_str}. Use 'column=value' or 'column!=value'")
+        raise ValueError(f"Invalid filter format: {filter_str}. Use operators: =, !=, >, >=, <, <=")
 
 
 def apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
@@ -108,19 +142,50 @@ def apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
         
         before_count = len(df_filtered)
         
-        # Try to convert value to numeric if possible
+        # Try to convert value to numeric for comparison operators
         try:
             numeric_value = float(value)
-            if operator == '=':
-                df_filtered = df_filtered[df_filtered[column] == numeric_value]
-            elif operator == '!=':
-                df_filtered = df_filtered[df_filtered[column] != numeric_value]
+            is_numeric = True
         except ValueError:
-            # String comparison
-            if operator == '=':
+            is_numeric = False
+            numeric_value = None
+        
+        # Apply filter based on operator
+        if operator == '=':
+            if is_numeric:
+                df_filtered = df_filtered[df_filtered[column] == numeric_value]
+            else:
                 df_filtered = df_filtered[df_filtered[column] == value]
-            elif operator == '!=':
+        
+        elif operator == '!=':
+            if is_numeric:
+                df_filtered = df_filtered[df_filtered[column] != numeric_value]
+            else:
                 df_filtered = df_filtered[df_filtered[column] != value]
+        
+        elif operator == '>':
+            if not is_numeric:
+                print(f"  WARNING: Operator '>' requires numeric value, got '{value}' - skipping")
+                continue
+            df_filtered = df_filtered[df_filtered[column] > numeric_value]
+        
+        elif operator == '>=':
+            if not is_numeric:
+                print(f"  WARNING: Operator '>=' requires numeric value, got '{value}' - skipping")
+                continue
+            df_filtered = df_filtered[df_filtered[column] >= numeric_value]
+        
+        elif operator == '<':
+            if not is_numeric:
+                print(f"  WARNING: Operator '<' requires numeric value, got '{value}' - skipping")
+                continue
+            df_filtered = df_filtered[df_filtered[column] < numeric_value]
+        
+        elif operator == '<=':
+            if not is_numeric:
+                print(f"  WARNING: Operator '<=' requires numeric value, got '{value}' - skipping")
+                continue
+            df_filtered = df_filtered[df_filtered[column] <= numeric_value]
         
         after_count = len(df_filtered)
         print(f"  {column} {operator} {value}: {before_count:,} → {after_count:,} samples")
@@ -316,8 +381,11 @@ def create_plot(df: pd.DataFrame, metrics: dict, output_dir: Path,
     # Title
     title = 'Hash-Diversity Correlation'
     if filters_applied:
-        title += '\n' + ' & '.join([f'{c}={v}' if op == '=' else f'{c}≠{v}' 
-                                    for c, op, v in filters_applied[:3]])
+        # Format each filter with its actual operator
+        filter_strs = []
+        for c, op, v in filters_applied[:3]:
+            filter_strs.append(f'{c}{op}{v}')
+        title += '\n' + ' & '.join(filter_strs)
         if len(filters_applied) > 3:
             title += f' (+{len(filters_applied)-3} more)'
     ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
@@ -472,7 +540,7 @@ def main():
         '--filter', '-f',
         action='append',
         default=[],
-        help='Filter condition in format "column=value" or "column!=value" (can be used multiple times)'
+        help='Filter condition using operators: =, !=, >, >=, <, <= (e.g., "mbytes>1024" or "organism=soil metagenome"). Can be used multiple times'
     )
     parser.add_argument(
         '--color-by', '-c',
