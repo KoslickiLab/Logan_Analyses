@@ -11,7 +11,7 @@ from pathlib import Path
 # Configuration
 DB_PATH = "/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined.duckdb"
 OUTPUT_DIR = "/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/jattr_analysis"
-MIN_KEY_COUNT = 1000
+MIN_KEY_COUNT = 5000
 TOP_N_VALUES = 20
 
 # Create output directory
