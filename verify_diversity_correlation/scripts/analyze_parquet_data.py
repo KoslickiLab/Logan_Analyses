@@ -1217,7 +1217,7 @@ def main():
         f.write(f"  Minimum diversity: {args.min_diversity}\n\n")
         f.write(f"Results:\n")
         f.write(f"  Samples after filtering: {stats['n']:,}\n")
-        f.write(f"  Pearson r: {stats['r']:.4f}\n")
+        f.write(f"  Pearson r: {stats['pearson_r']:.4f}\n")
         f.write(f"  p-value: {stats['p']:.2e}\n")
         f.write(f"  R²: {stats['r2']:.4f}\n")
     
