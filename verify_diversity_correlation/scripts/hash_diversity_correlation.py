@@ -71,7 +71,9 @@ plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans']
 
 # Database paths
 YACHT_DB = "/scratch/shared_data_new/Logan_yacht_data/processed_data/database_all.db"
-METADATA_DB = "/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined.duckdb"
+# Changing to this new metadata DB (which concentrates on the 5M Logan metagenomes obviates the need for the AND ((
+# organism ILIKE '%metageno%') OR (librarysource in ('METAGENOMIC', 'METATRANSCRIPTOMIC'))) filter
+METADATA_DB = "/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined_5M.duckdb"
 
 
 @dataclass
@@ -105,7 +107,10 @@ def get_wgs_samples(config: Config) -> pd.DataFrame:
     print("\n" + "="*70)
     print("STEP 1: Querying WGS metagenomic samples")
     print("="*70)
-    
+
+    # Changing to this new metadata DB (which concentrates on the 5M Logan metagenomes obviates the need for the AND ((
+    # organism ILIKE '%metageno%') OR (librarysource in ('METAGENOMIC', 'METATRANSCRIPTOMIC'))) filter
+    # METADATA_DB = "/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined_5M.duckdb"
     query = f"""
     SELECT 
         acc,
