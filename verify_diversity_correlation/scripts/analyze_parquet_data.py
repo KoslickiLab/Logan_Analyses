@@ -1158,7 +1158,7 @@ def main():
     parser.add_argument('--min-mbases', type=int, default=0,
                        help='Minimum sequencing depth in megabases (0 = no filter)')
     parser.add_argument('--metadata-db', 
-                       default='/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined.duckdb',
+                       default='/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined_5M.duckdb',
                        help='Path to metadata database')
     parser.add_argument('--join-metadata', action='store_true',
                        help='Join with metadata database')
