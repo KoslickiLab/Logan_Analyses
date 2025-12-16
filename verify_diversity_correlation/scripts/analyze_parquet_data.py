@@ -155,7 +155,7 @@ def plot_filtered_correlation(df: pd.DataFrame, output_dir: Path, label: str = "
     
     if has_dcor:
         try:
-            distance_corr = dcor.distance_correlation(x, y)
+            distance_corr = dcor.distance_correlation(x, y, method='AVL')
         except:
             distance_corr = np.nan
     else:
