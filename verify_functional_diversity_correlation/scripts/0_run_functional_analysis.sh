@@ -46,7 +46,7 @@ echo "-----------------------------------------------------------------------"
 if python3 "${SCRIPT_DIR}/functional_hash_diversity_correlation.py" \
     --output-dir "$OUTPUT_DIR" \
     --n-jobs "$N_JOBS" \
-    --metric-subsample 50000 \
+    --max-corr-samples 50000 \
     --min-mbases 100; then
     
     echo ""
