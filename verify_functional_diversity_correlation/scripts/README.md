@@ -34,7 +34,7 @@ Main driver script that runs the full analysis pipeline.
 ./0_run_functional_analysis.sh
 ```
 
-Output: `/scratch/dmk333_new/Logan/Logan_Analyses/verify_diversity_correlation/data/functional_hash_diversity_results/`
+Output: `/scratch/dmk333_new/Logan/Logan_Analyses/verify_functional_correlation/data/functional_hash_diversity_results/`
 
 ### functional_hash_diversity_correlation.py
 Core analysis script. Extracts data, computes diversity metrics, performs correlation analysis, generates plots.

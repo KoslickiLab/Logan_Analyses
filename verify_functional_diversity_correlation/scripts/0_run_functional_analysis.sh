@@ -3,7 +3,7 @@
 # Uses FracMinHash amino acid sketches (k=11, scale=1000) from fmh-funprofiler
 
 # Configuration
-BASE_OUTPUT_DIR="/scratch/dmk333_new/Logan/Logan_Analyses/verify_diversity_correlation/data"
+BASE_OUTPUT_DIR="/scratch/dmk333_new/Logan/Logan_Analyses/verify_functional_diversity_correlation/data"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 N_JOBS=200  # Leave some cores free for system
 LOG_FILE="${BASE_OUTPUT_DIR}/run_functional_analysis.log"

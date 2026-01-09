@@ -5,7 +5,7 @@
 # These mirror the filters used for taxonomic analysis
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_DIR="/scratch/dmk333_new/Logan/Logan_Analyses/verify_diversity_correlation/data"
+BASE_DIR="/scratch/dmk333_new/Logan/Logan_Analyses/verify_functional_diversity_correlation/data"
 
 # Standard filter: min 1620 mbases, min 10 KOs (functional diversity)
 echo "Running filtered analysis with min_mbases=1620, min_diversity=10..."
