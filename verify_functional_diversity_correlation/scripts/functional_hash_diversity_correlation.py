@@ -213,8 +213,12 @@ def calculate_diversity_metrics(abundances: np.ndarray) -> Dict[str, float]:
     """
     Calculate multiple diversity metrics from abundance data.
     
+    Note: This function works correctly with both raw counts AND relative abundances.
+    The abundances are normalized to sum to 1 before calculating diversity indices,
+    so the input can be either counts or proportions.
+    
     Args:
-        abundances: Array of abundances (counts or proportions)
+        abundances: Array of abundances (counts or relative abundances/proportions)
         
     Returns:
         Dictionary of diversity metrics
@@ -226,12 +230,14 @@ def calculate_diversity_metrics(abundances: np.ndarray) -> Dict[str, float]:
     if len(abundances) == 0:
         return {metric: np.nan for metric in DIVERSITY_METRICS}
     
-    # Calculate proportional abundances
+    # Normalize abundances to proportions that sum to exactly 1
+    # This ensures diversity indices are calculated correctly regardless of
+    # whether input is raw counts or relative abundances
     total = abundances.sum()
     if total == 0:
         return {metric: np.nan for metric in DIVERSITY_METRICS}
     
-    p = abundances / total
+    p = abundances / total  # Now p sums to exactly 1.0
     
     # Observed Richness (S) - number of species/KOs
     S = len(abundances)
@@ -362,7 +368,9 @@ def process_sample_batch(sample_ids: List[str]) -> List[Dict]:
                 if ko_df.empty:
                     continue
                 
-                # Calculate diversity metrics
+                # Calculate diversity metrics from KO abundances
+                # Note: calculate_diversity_metrics normalizes abundances to sum to 1,
+                # so this works correctly whether input is raw counts or relative abundance
                 abundances = ko_df['abundance'].values
                 diversity_metrics = calculate_diversity_metrics(abundances)
                 
@@ -1005,6 +1013,12 @@ def main():
         help='Minimum megabases for sample inclusion'
     )
     parser.add_argument(
+        '--max-corr-samples',
+        type=int,
+        default=50000,
+        help='Max samples for expensive correlations (dcor, MIC). Subsamples if larger.'
+    )
+    parser.add_argument(
         '--random-seed',
         type=int,
         default=42,
@@ -1016,8 +1030,6 @@ def main():
         default=300,
         help='DPI for saved figures'
     )
-    parser.add_argument('--metric-subsample', type=int, default=50000, help='Number of subsampled data sets for the '
-                                                                            'expensive metrics.')
     
     args = parser.parse_args()
     
@@ -1027,9 +1039,9 @@ def main():
         n_samples=args.n_samples,
         n_jobs=args.n_jobs,
         min_mbases=args.min_mbases,
+        max_samples_for_expensive_corr=args.max_corr_samples,
         random_seed=args.random_seed,
-        dpi=args.dpi,
-        max_samples_for_expensive_corr=args.metric_subsample
+        dpi=args.dpi
     )
     
     logger.info("="*70)
