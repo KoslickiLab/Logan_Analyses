@@ -1016,6 +1016,8 @@ def main():
         default=300,
         help='DPI for saved figures'
     )
+    parser.add_argument('--metric-subsample', type=int, default=50000, help='Number of subsampled data sets for the '
+                                                                            'expensive metrics.')
     
     args = parser.parse_args()
     
@@ -1026,7 +1028,8 @@ def main():
         n_jobs=args.n_jobs,
         min_mbases=args.min_mbases,
         random_seed=args.random_seed,
-        dpi=args.dpi
+        dpi=args.dpi,
+        max_samples_for_expensive_corr=args.metric_subsample
     )
     
     logger.info("="*70)
