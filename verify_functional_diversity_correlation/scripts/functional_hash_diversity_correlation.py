@@ -32,10 +32,12 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import logging
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional
 import warnings
+from datetime import datetime
 
 import duckdb
 import numpy as np
@@ -48,20 +50,39 @@ from sklearn.metrics import r2_score
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
+def log_step(step_name: str, start: bool = True):
+    """Log the start or end of a processing step with timestamp."""
+    if start:
+        logger.info(f"{'='*60}")
+        logger.info(f"STARTING: {step_name}")
+        logger.info(f"{'='*60}")
+    else:
+        logger.info(f"COMPLETED: {step_name}")
+        logger.info(f"{'-'*60}")
+
 # Import optional correlation libraries
 try:
     import dcor
     HAS_DCOR = True
 except ImportError:
     HAS_DCOR = False
-    print("Note: dcor not installed - distance correlation will be skipped")
+    # Note: dcor not installed - distance correlation will be skipped
 
 try:
     from minepy import MINE
     HAS_MINE = True
 except ImportError:
     HAS_MINE = False
-    print("Note: minepy not installed - MIC will be skipped")
+    # Note: minepy not installed - MIC will be skipped
 
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -101,6 +122,7 @@ class Config:
     normalization_factor: float = 1_000_000.0  # Per million bases
     figure_size: Tuple[float, float] = (10, 8)
     dpi: int = 300
+    max_samples_for_expensive_corr: int = 50000  # Subsample for dcor/MIC if larger
     
     def __post_init__(self):
         self.output_dir = Path(self.output_dir)
@@ -108,6 +130,83 @@ class Config:
         (self.output_dir / "plots").mkdir(exist_ok=True)
         (self.output_dir / "data").mkdir(exist_ok=True)
         (self.output_dir / "reports").mkdir(exist_ok=True)
+
+
+def compute_expensive_correlations(args: Tuple) -> Dict:
+    """
+    Compute expensive correlation metrics (distance correlation, MIC) for a single metric.
+    Designed to be run in parallel.
+    
+    Args:
+        args: Tuple of (metric_col, metric_name, x_array, y_array, max_samples)
+        
+    Returns:
+        Dictionary with metric results
+    """
+    metric_col, metric_name, x, y, max_samples = args
+    
+    n_samples = len(x)
+    results = {
+        'metric_col': metric_col,
+        'metric_name': metric_name,
+        'n_samples': n_samples,
+    }
+    
+    # Subsample if dataset is too large for expensive calculations
+    if n_samples > max_samples:
+        np.random.seed(42)  # For reproducibility
+        indices = np.random.choice(n_samples, max_samples, replace=False)
+        x_sub = x[indices]
+        y_sub = y[indices]
+        results['subsampled'] = True
+        results['subsample_size'] = max_samples
+    else:
+        x_sub = x
+        y_sub = y
+        results['subsampled'] = False
+    
+    # Fast correlations (always compute on full data)
+    from scipy.stats import pearsonr, spearmanr, kendalltau
+    results['pearson_r'], results['pearson_p'] = pearsonr(x, y)
+    results['spearman_r'], results['spearman_p'] = spearmanr(x, y)
+    results['kendall_tau'], results['kendall_p'] = kendalltau(x, y)
+    
+    # Linear regression (fast)
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+    X = x.reshape(-1, 1)
+    model = LinearRegression()
+    model.fit(X, y)
+    y_pred = model.predict(X)
+    results['r2'] = r2_score(y, y_pred)
+    results['slope'] = model.coef_[0]
+    results['intercept'] = model.intercept_
+    
+    # Distance correlation (expensive - use subsampled data)
+    try:
+        import dcor
+        # Use AVL method for better performance
+        results['distance_corr'] = dcor.distance_correlation(x_sub, y_sub, method='AVL')
+    except ImportError:
+        results['distance_corr'] = np.nan
+    except Exception:
+        results['distance_corr'] = np.nan
+    
+    # MIC (expensive - use subsampled data)
+    try:
+        from minepy import MINE
+        if len(x_sub) >= 50:
+            mine = MINE(alpha=0.6, c=15)
+            mine.compute_score(x_sub, y_sub)
+            results['mic'] = mine.mic()
+        else:
+            results['mic'] = np.nan
+    except ImportError:
+        results['mic'] = np.nan
+    except Exception:
+        results['mic'] = np.nan
+    
+    return results
 
 
 def calculate_diversity_metrics(abundances: np.ndarray) -> Dict[str, float]:
@@ -175,9 +274,8 @@ def get_wgs_samples(config: Config) -> pd.DataFrame:
     Returns:
         DataFrame with columns: acc, mbases
     """
-    print("\n" + "="*70)
-    print("STEP 1: Querying WGS metagenomic samples")
-    print("="*70)
+    log_step("STEP 1: Querying WGS metagenomic samples")
+    step_start = time.time()
 
     query = f"""
     SELECT 
@@ -190,28 +288,31 @@ def get_wgs_samples(config: Config) -> pd.DataFrame:
     ORDER BY acc
     """
     
-    print(f"Connecting to {METADATA_DB}...")
+    logger.info(f"Connecting to {METADATA_DB}...")
     conn = duckdb.connect(METADATA_DB, read_only=True, config={'threads': 1})
     
     try:
-        print("Executing query...")
+        logger.info("Executing query...")
         df = conn.execute(query).fetchdf()
-        print(f"Found {len(df):,} WGS metagenomic samples")
+        logger.info(f"Found {len(df):,} WGS metagenomic samples")
         
         if config.n_samples and len(df) > config.n_samples:
-            print(f"Randomly sampling {config.n_samples:,} samples (seed={config.random_seed})")
+            logger.info(f"Randomly sampling {config.n_samples:,} samples (seed={config.random_seed})")
             df = df.sample(n=config.n_samples, random_state=config.random_seed)
             df = df.sort_values('acc').reset_index(drop=True)
         
-        print(f"\nSample statistics:")
-        print(f"  Mbases range: {df['mbases'].min():.1f} - {df['mbases'].max():.1f}")
-        print(f"  Mbases mean: {df['mbases'].mean():.1f}")
-        print(f"  Mbases median: {df['mbases'].median():.1f}")
+        logger.info(f"Sample statistics:")
+        logger.info(f"  Mbases range: {df['mbases'].min():.1f} - {df['mbases'].max():.1f}")
+        logger.info(f"  Mbases mean: {df['mbases'].mean():.1f}")
+        logger.info(f"  Mbases median: {df['mbases'].median():.1f}")
         
         # Save sample list
         sample_file = config.output_dir / "data" / "selected_samples.csv"
         df.to_csv(sample_file, index=False)
-        print(f"\nSaved sample list to: {sample_file}")
+        logger.info(f"Saved sample list to: {sample_file}")
+        
+        elapsed = time.time() - step_start
+        log_step(f"STEP 1: Querying WGS samples (took {elapsed:.1f}s)", start=False)
         
         return df
         
@@ -275,7 +376,7 @@ def process_sample_batch(sample_ids: List[str]) -> List[Dict]:
                 results.append(result)
                 
             except Exception as e:
-                print(f"Warning: Error processing {sample_id}: {e}", file=sys.stderr)
+                # Skip samples that cause errors - logged by caller
                 continue
                 
     finally:
@@ -295,23 +396,24 @@ def extract_hash_and_diversity_data(samples_df: pd.DataFrame, config: Config) ->
     Returns:
         DataFrame with columns: sample_id, num_hashes, diversity metrics, mbases
     """
-    print("\n" + "="*70)
-    print("STEP 2: Extracting hash counts and functional diversity metrics")
-    print("="*70)
-    print(f"Using {config.n_jobs} parallel workers")
+    log_step("STEP 2: Extracting hash counts and functional diversity metrics")
+    step_start = time.time()
+    
+    logger.info(f"Using {config.n_jobs} parallel workers")
     
     # Split samples into batches for parallel processing
     sample_ids = samples_df['acc'].tolist()
     batch_size = max(1, len(sample_ids) // (config.n_jobs * 4))
     batches = [sample_ids[i:i+batch_size] for i in range(0, len(sample_ids), batch_size)]
     
-    print(f"Processing {len(sample_ids):,} samples in {len(batches)} batches")
-    print(f"Batch size: ~{batch_size} samples")
+    logger.info(f"Processing {len(sample_ids):,} samples in {len(batches)} batches")
+    logger.info(f"Batch size: ~{batch_size} samples")
     
     # Process batches in parallel
     all_results = []
-    start_time = time.time()
+    extraction_start = time.time()
     
+    logger.info("Starting parallel batch processing...")
     with ProcessPoolExecutor(max_workers=config.n_jobs) as executor:
         futures = {
             executor.submit(process_sample_batch, batch): i 
@@ -324,22 +426,22 @@ def extract_hash_and_diversity_data(samples_df: pd.DataFrame, config: Config) ->
                     batch_results = future.result()
                     all_results.extend(batch_results)
                 except Exception as e:
-                    print(f"\nError in batch: {e}", file=sys.stderr)
+                    logger.error(f"Error in batch: {e}")
                 pbar.update(1)
     
-    elapsed = time.time() - start_time
-    print(f"\nProcessing complete in {elapsed:.1f}s ({len(sample_ids)/elapsed:.1f} samples/s)")
+    extraction_elapsed = time.time() - extraction_start
+    logger.info(f"Batch processing complete in {extraction_elapsed:.1f}s ({len(sample_ids)/extraction_elapsed:.1f} samples/s)")
     
     # Convert to DataFrame
+    logger.info("Converting results to DataFrame...")
     results_df = pd.DataFrame(all_results)
     
     if results_df.empty:
-        print("ERROR: No data extracted! Check that samples exist in functional profile database.", 
-              file=sys.stderr)
+        logger.error("No data extracted! Check that samples exist in functional profile database.")
         sys.exit(1)
     
-    print(f"\nSuccessfully extracted data for {len(results_df):,} samples")
-    print(f"Samples with no data: {len(sample_ids) - len(results_df):,}")
+    logger.info(f"Successfully extracted data for {len(results_df):,} samples")
+    logger.info(f"Samples with no data: {len(sample_ids) - len(results_df):,}")
     
     # Merge with mbases from original samples
     results_df = results_df.merge(
@@ -353,23 +455,26 @@ def extract_hash_and_diversity_data(samples_df: pd.DataFrame, config: Config) ->
     results_df['hashes_per_mb'] = results_df['num_hashes'] / results_df['mbases']
     
     # Normalize diversity metrics per megabase
+    logger.info("Normalizing diversity metrics per megabase...")
     for metric in DIVERSITY_METRICS:
         if metric in results_df.columns:
             results_df[f'{metric}_per_mb'] = results_df[metric] / results_df['mbases']
     
-    print(f"\nData summary:")
-    print(f"  Hashes range: {results_df['num_hashes'].min():,.0f} - {results_df['num_hashes'].max():,.0f}")
-    print(f"  Hashes per Mb range: {results_df['hashes_per_mb'].min():.2f} - {results_df['hashes_per_mb'].max():.2f}")
-    print(f"  Observed richness (KOs) range: {results_df['observed_richness'].min():.0f} - {results_df['observed_richness'].max():.0f}")
-    print(f"  Shannon index range: {results_df['shannon_index'].min():.2f} - {results_df['shannon_index'].max():.2f}")
-    print(f"  Hill 2 range: {results_df['hill_2'].min():.2f} - {results_df['hill_2'].max():.2f}")
+    logger.info(f"Data summary:")
+    logger.info(f"  Hashes range: {results_df['num_hashes'].min():,.0f} - {results_df['num_hashes'].max():,.0f}")
+    logger.info(f"  Hashes per Mb range: {results_df['hashes_per_mb'].min():.2f} - {results_df['hashes_per_mb'].max():.2f}")
+    logger.info(f"  Observed richness (KOs) range: {results_df['observed_richness'].min():.0f} - {results_df['observed_richness'].max():.0f}")
+    logger.info(f"  Shannon index range: {results_df['shannon_index'].min():.2f} - {results_df['shannon_index'].max():.2f}")
+    logger.info(f"  Hill 2 range: {results_df['hill_2'].min():.2f} - {results_df['hill_2'].max():.2f}")
     
     # Save raw data
+    logger.info("Saving raw data to CSV...")
     data_file = config.output_dir / "data" / "functional_hash_diversity_data.csv"
     results_df.to_csv(data_file, index=False)
-    print(f"\nSaved raw data to: {data_file}")
+    logger.info(f"Saved raw data to: {data_file}")
     
     # Save parquet file with key columns for downstream analysis
+    logger.info("Saving parquet file...")
     parquet_cols = [
         'sample_id', 'num_hashes', 'hashes_per_mb', 'mbases',
         'observed_richness', 'shannon_index', 'simpson_index', 'gini_simpson',
@@ -392,8 +497,10 @@ def extract_hash_and_diversity_data(samples_df: pd.DataFrame, config: Config) ->
     # Save as parquet
     parquet_file = config.output_dir / "data" / "functional_hash_diversity_data.parquet"
     parquet_df.to_parquet(parquet_file, index=False)
-    print(f"Saved parquet file to: {parquet_file}")
-    print(f"  Columns: {parquet_df.columns.tolist()}")
+    logger.info(f"Saved parquet file to: {parquet_file}")
+    
+    step_elapsed = time.time() - step_start
+    log_step(f"STEP 2: Data extraction (took {step_elapsed:.1f}s)", start=False)
     
     return results_df
 
@@ -401,6 +508,7 @@ def extract_hash_and_diversity_data(samples_df: pd.DataFrame, config: Config) ->
 def perform_correlation_analysis(df: pd.DataFrame, config: Config) -> Dict:
     """
     Perform correlation analysis between hashes and all diversity metrics.
+    Uses parallel processing for expensive calculations (distance correlation, MIC).
     
     Args:
         df: DataFrame with hash and diversity data
@@ -409,11 +517,8 @@ def perform_correlation_analysis(df: pd.DataFrame, config: Config) -> Dict:
     Returns:
         Dictionary of analysis results for each metric
     """
-    print("\n" + "="*70)
-    print("STEP 3: Correlation analysis")
-    print("="*70)
-    
-    all_results = {}
+    log_step("STEP 3: Correlation analysis (parallel)")
+    step_start = time.time()
     
     # List of diversity metrics to correlate with hashes_per_mb
     metrics_to_analyze = [
@@ -426,82 +531,69 @@ def perform_correlation_analysis(df: pd.DataFrame, config: Config) -> Dict:
         ('pielou_evenness', 'Pielou Evenness (raw)'),
     ]
     
+    # Prepare tasks for parallel processing
+    tasks = []
     for metric_col, metric_name in metrics_to_analyze:
         if metric_col not in df.columns:
+            logger.warning(f"Skipping {metric_name}: column not found")
             continue
             
-        # Remove rows with missing data
         df_clean = df.dropna(subset=['hashes_per_mb', metric_col])
         n_samples = len(df_clean)
         
         if n_samples < 10:
-            print(f"\nSkipping {metric_name}: insufficient data (n={n_samples})")
+            logger.warning(f"Skipping {metric_name}: insufficient data (n={n_samples})")
             continue
         
-        print(f"\nAnalyzing: {metric_name}")
-        print(f"  Samples with complete data: {n_samples:,}")
+        x = df_clean['hashes_per_mb'].values.copy()
+        y = df_clean[metric_col].values.copy()
         
-        x = df_clean['hashes_per_mb'].values
-        y = df_clean[metric_col].values
+        tasks.append((metric_col, metric_name, x, y, config.max_samples_for_expensive_corr))
+        logger.info(f"Queued {metric_name}: {n_samples:,} samples")
+    
+    if not tasks:
+        logger.error("No metrics to analyze!")
+        return {}
+    
+    logger.info(f"Processing {len(tasks)} metrics in parallel...")
+    logger.info(f"Max samples for expensive correlations: {config.max_samples_for_expensive_corr:,}")
+    
+    # Process metrics in parallel
+    all_results = {}
+    parallel_start = time.time()
+    
+    # Use min of n_jobs and number of tasks
+    n_workers = min(config.n_jobs, len(tasks))
+    logger.info(f"Using {n_workers} parallel workers for correlation calculations")
+    
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        futures = {executor.submit(compute_expensive_correlations, task): task[0] 
+                   for task in tasks}
         
-        # Calculate correlations
-        pearson_r, pearson_p = pearsonr(x, y)
-        spearman_r, spearman_p = spearmanr(x, y)
-        kendall_tau, kendall_p = kendalltau(x, y)
-        
-        # Distance correlation
-        if HAS_DCOR:
+        for future in as_completed(futures):
+            metric_col = futures[future]
             try:
-                distance_corr = dcor.distance_correlation(x, y)
-            except:
-                distance_corr = np.nan
-        else:
-            distance_corr = np.nan
-        
-        # MIC
-        if HAS_MINE and n_samples >= 50:
-            try:
-                mine = MINE(alpha=0.6, c=15)
-                mine.compute_score(x, y)
-                mic_score = mine.mic()
-            except:
-                mic_score = np.nan
-        else:
-            mic_score = np.nan
-        
-        # Linear regression
-        X = x.reshape(-1, 1)
-        model = LinearRegression()
-        model.fit(X, y)
-        y_pred = model.predict(X)
-        r2 = r2_score(y, y_pred)
-        slope = model.coef_[0]
-        intercept = model.intercept_
-        
-        results = {
-            'metric_name': metric_name,
-            'metric_col': metric_col,
-            'n_samples': n_samples,
-            'pearson_r': pearson_r,
-            'pearson_p': pearson_p,
-            'spearman_r': spearman_r,
-            'spearman_p': spearman_p,
-            'kendall_tau': kendall_tau,
-            'kendall_p': kendall_p,
-            'distance_corr': distance_corr,
-            'mic': mic_score,
-            'r2': r2,
-            'slope': slope,
-            'intercept': intercept,
-        }
-        
-        all_results[metric_col] = results
-        
-        print(f"  Pearson r:  {pearson_r:.4f} (p={pearson_p:.2e})")
-        print(f"  Spearman ρ: {spearman_r:.4f} (p={spearman_p:.2e})")
-        print(f"  R²:         {r2:.4f}")
-        if not np.isnan(distance_corr):
-            print(f"  Distance corr: {distance_corr:.4f}")
+                results = future.result()
+                all_results[metric_col] = results
+                
+                # Log the results
+                logger.info(f"  {results['metric_name']}:")
+                logger.info(f"    n={results['n_samples']:,}, Pearson r={results['pearson_r']:.4f}, "
+                           f"Spearman ρ={results['spearman_r']:.4f}, R²={results['r2']:.4f}")
+                if not np.isnan(results['distance_corr']):
+                    subsampled_str = f" (subsampled to {results.get('subsample_size', 'N/A')})" if results.get('subsampled', False) else ""
+                    logger.info(f"    Distance corr={results['distance_corr']:.4f}{subsampled_str}")
+                if not np.isnan(results['mic']):
+                    logger.info(f"    MIC={results['mic']:.4f}")
+                    
+            except Exception as e:
+                logger.error(f"Error computing correlations for {metric_col}: {e}")
+    
+    parallel_elapsed = time.time() - parallel_start
+    logger.info(f"Parallel correlation calculations complete in {parallel_elapsed:.1f}s")
+    
+    step_elapsed = time.time() - step_start
+    log_step(f"STEP 3: Correlation analysis (took {step_elapsed:.1f}s)", start=False)
     
     return all_results
 
@@ -510,13 +602,12 @@ def create_visualizations(df: pd.DataFrame, results: Dict, config: Config):
     """
     Create publication-quality visualizations for all diversity metrics.
     """
-    print("\n" + "="*70)
-    print("STEP 4: Creating visualizations")
-    print("="*70)
+    log_step("STEP 4: Creating visualizations")
+    step_start = time.time()
     
     for metric_col, metric_results in results.items():
         metric_name = metric_results['metric_name']
-        print(f"\nCreating plots for: {metric_name}")
+        logger.info(f"Creating plots for: {metric_name}")
         
         df_clean = df.dropna(subset=['hashes_per_mb', metric_col])
         
@@ -582,16 +673,22 @@ def create_visualizations(df: pd.DataFrame, results: Dict, config: Config):
         plot_file = config.output_dir / "plots" / f"hash_vs_{safe_name}_correlation.png"
         plt.savefig(plot_file, dpi=config.dpi, bbox_inches='tight')
         plt.close()
-        print(f"  Saved: {plot_file.name}")
+        logger.info(f"  Saved: {plot_file.name}")
     
     # Create summary multi-panel figure
+    logger.info("Creating summary multi-panel figure...")
     create_summary_figure(df, results, config)
     
     # Create hexbin for main metric (observed richness)
+    logger.info("Creating hexbin plot...")
     create_hexbin_plot(df, config)
     
     # Create distribution plots
+    logger.info("Creating distribution plots...")
     create_distribution_plots(df, config)
+    
+    step_elapsed = time.time() - step_start
+    log_step(f"STEP 4: Visualizations (took {step_elapsed:.1f}s)", start=False)
 
 
 def create_summary_figure(df: pd.DataFrame, results: Dict, config: Config):
@@ -653,7 +750,7 @@ def create_summary_figure(df: pd.DataFrame, results: Dict, config: Config):
     plt.savefig(config.output_dir / "plots" / "summary_all_metrics.png", 
                 dpi=config.dpi, bbox_inches='tight')
     plt.close()
-    print("Saved summary figure: summary_all_metrics.png")
+    logger.info("Saved summary figure: summary_all_metrics.png")
 
 
 def create_hexbin_plot(df: pd.DataFrame, config: Config):
@@ -682,7 +779,7 @@ def create_hexbin_plot(df: pd.DataFrame, config: Config):
     plt.savefig(config.output_dir / "plots" / "hash_diversity_hexbin.png", 
                 dpi=config.dpi, bbox_inches='tight')
     plt.close()
-    print("Saved hexbin plot")
+    logger.info("Saved hexbin plot")
 
 
 def create_distribution_plots(df: pd.DataFrame, config: Config):
@@ -751,14 +848,13 @@ def create_distribution_plots(df: pd.DataFrame, config: Config):
     plt.savefig(config.output_dir / "plots" / "distributions.png", 
                 dpi=config.dpi, bbox_inches='tight')
     plt.close()
-    print("Saved distribution plots")
+    logger.info("Saved distribution plots")
 
 
 def generate_report(df: pd.DataFrame, results: Dict, config: Config):
     """Generate a comprehensive text report of the analysis."""
-    print("\n" + "="*70)
-    print("STEP 5: Generating report")
-    print("="*70)
+    log_step("STEP 5: Generating report")
+    step_start = time.time()
     
     report_file = config.output_dir / "reports" / "analysis_report.txt"
     
@@ -861,9 +957,10 @@ def generate_report(df: pd.DataFrame, results: Dict, config: Config):
         f.write("END OF REPORT\n")
         f.write("="*70 + "\n")
     
-    print(f"Saved report to: {report_file}")
+    logger.info(f"Saved report to: {report_file}")
     
     # Save statistics as CSV
+    logger.info("Saving statistics summary...")
     stats_rows = []
     for metric_col, metric_results in results.items():
         stats_rows.append(metric_results)
@@ -871,7 +968,10 @@ def generate_report(df: pd.DataFrame, results: Dict, config: Config):
     stats_df = pd.DataFrame(stats_rows)
     stats_file = config.output_dir / "reports" / "statistics_summary.csv"
     stats_df.to_csv(stats_file, index=False)
-    print(f"Saved statistics to: {stats_file}")
+    logger.info(f"Saved statistics to: {stats_file}")
+    
+    step_elapsed = time.time() - step_start
+    log_step(f"STEP 5: Report generation (took {step_elapsed:.1f}s)", start=False)
 
 
 def main():
@@ -929,17 +1029,18 @@ def main():
         dpi=args.dpi
     )
     
-    print("\n" + "="*70)
-    print("FUNCTIONAL HASH-DIVERSITY CORRELATION ANALYSIS")
-    print("="*70)
-    print(f"Configuration:")
-    print(f"  Output directory: {config.output_dir}")
-    print(f"  Number of samples: {'all' if config.n_samples is None else f'{config.n_samples:,}'}")
-    print(f"  Parallel workers: {config.n_jobs}")
-    print(f"  Minimum mbases: {config.min_mbases}")
-    print(f"  Random seed: {config.random_seed}")
-    print(f"  FracMinHash: k=11 (amino acid), scale=1000")
-    print("="*70)
+    logger.info("="*70)
+    logger.info("FUNCTIONAL HASH-DIVERSITY CORRELATION ANALYSIS")
+    logger.info("="*70)
+    logger.info(f"Configuration:")
+    logger.info(f"  Output directory: {config.output_dir}")
+    logger.info(f"  Number of samples: {'all' if config.n_samples is None else f'{config.n_samples:,}'}")
+    logger.info(f"  Parallel workers: {config.n_jobs}")
+    logger.info(f"  Minimum mbases: {config.min_mbases}")
+    logger.info(f"  Random seed: {config.random_seed}")
+    logger.info(f"  Max samples for dcor/MIC: {config.max_samples_for_expensive_corr:,}")
+    logger.info(f"  FracMinHash: k=11 (amino acid), scale=1000")
+    logger.info("="*70)
     
     start_time = time.time()
     
@@ -960,21 +1061,21 @@ def main():
     
     elapsed = time.time() - start_time
     
-    print("\n" + "="*70)
-    print("ANALYSIS COMPLETE")
-    print("="*70)
-    print(f"Total time: {elapsed/60:.1f} minutes")
+    logger.info("="*70)
+    logger.info("ANALYSIS COMPLETE")
+    logger.info("="*70)
+    logger.info(f"Total time: {elapsed/60:.1f} minutes")
     
     if 'observed_richness_per_mb' in results:
         r = results['observed_richness_per_mb']
-        print(f"\nKey findings (KO Richness):")
-        print(f"  Spearman ρ = {r['spearman_r']:.4f} (p = {r['spearman_p']:.2e})")
-        print(f"  Pearson r = {r['pearson_r']:.4f} (p = {r['pearson_p']:.2e})")
-        print(f"  R² = {r['r2']:.4f}")
-        print(f"  Samples analyzed: {r['n_samples']:,}")
+        logger.info(f"Key findings (KO Richness):")
+        logger.info(f"  Spearman ρ = {r['spearman_r']:.4f} (p = {r['spearman_p']:.2e})")
+        logger.info(f"  Pearson r = {r['pearson_r']:.4f} (p = {r['pearson_p']:.2e})")
+        logger.info(f"  R² = {r['r2']:.4f}")
+        logger.info(f"  Samples analyzed: {r['n_samples']:,}")
     
-    print(f"\nOutputs saved to: {config.output_dir}/")
-    print("="*70 + "\n")
+    logger.info(f"Outputs saved to: {config.output_dir}/")
+    logger.info("="*70)
 
 
 if __name__ == "__main__":
