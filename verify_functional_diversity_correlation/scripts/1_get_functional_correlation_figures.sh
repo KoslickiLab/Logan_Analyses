@@ -16,23 +16,23 @@ python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
     --min-diversity 10 \
     --join-metadata
 
-echo ""
-echo "Running filtered analysis with min_hashes=10000, min_diversity=10..."
-python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
-    --input "${BASE_DIR}/functional_hash_diversity_results/data/functional_hash_diversity_data.parquet" \
-    --output "${BASE_DIR}/functional_hash_diversity_results/analysis/filtered_analysis_min_hash_10000_min_diversity_10" \
-    --min-hashes 10000 \
-    --min-diversity 10 \
-    --join-metadata
+#echo ""
+#echo "Running filtered analysis with min_hashes=10000, min_diversity=10..."
+#python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
+#    --input "${BASE_DIR}/functional_hash_diversity_results/data/functional_hash_diversity_data.parquet" \
+#    --output "${BASE_DIR}/functional_hash_diversity_results/analysis/filtered_analysis_min_hash_10000_min_diversity_10" \
+#    --min-hashes 10000 \
+#    --min-diversity 10 \
+#    --join-metadata
 
-echo ""
-echo "Running filtered analysis with min_hashes=1000, min_diversity=100..."
-python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
-    --input "${BASE_DIR}/functional_hash_diversity_results/data/functional_hash_diversity_data.parquet" \
-    --output "${BASE_DIR}/functional_hash_diversity_results/analysis/filtered_analysis_min_hash_1000_min_diversity_100" \
-    --min-hashes 1000 \
-    --min-diversity 100 \
-    --join-metadata
+#echo ""
+#echo "Running filtered analysis with min_hashes=1000, min_diversity=100..."
+#python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
+#    --input "${BASE_DIR}/functional_hash_diversity_results/data/functional_hash_diversity_data.parquet" \
+#    --output "${BASE_DIR}/functional_hash_diversity_results/analysis/filtered_analysis_min_hash_1000_min_diversity_100" \
+#    --min-hashes 1000 \
+#    --min-diversity 100 \
+#    --join-metadata
 
 echo ""
 echo "All analyses complete!"
