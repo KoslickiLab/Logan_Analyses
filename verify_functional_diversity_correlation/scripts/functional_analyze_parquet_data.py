@@ -37,9 +37,26 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import duckdb
 import numpy as np
+import time
+import logging
 from scipy.stats import pearsonr, spearmanr, kendalltau
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Dict, List, Tuple, Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# Set matplotlib to non-interactive backend for parallel processing
+import matplotlib
+
+matplotlib.use('Agg')
 
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
@@ -47,12 +64,14 @@ sns.set_context("paper", font_scale=1.3)
 # Import optional libraries
 try:
     import dcor
+
     HAS_DCOR = True
 except ImportError:
     HAS_DCOR = False
 
 try:
     from minepy import MINE
+
     HAS_MINE = True
 except ImportError:
     HAS_MINE = False
@@ -68,62 +87,90 @@ DIVERSITY_METRICS = [
 ]
 
 
+def log_step(step_name: str, start: bool = True):
+    """Log the start or end of a processing step with timestamp."""
+    if start:
+        logger.info(f"{'=' * 60}")
+        logger.info(f"STARTING: {step_name}")
+        logger.info(f"{'=' * 60}")
+    else:
+        logger.info(f"COMPLETED: {step_name}")
+        logger.info(f"{'-' * 60}")
+
+
 def load_parquet_data(parquet_file: Path) -> pd.DataFrame:
     """Load the parquet file."""
-    print(f"Loading data from: {parquet_file}")
+    log_step("Loading parquet data")
+    start = time.time()
+
+    logger.info(f"Loading data from: {parquet_file}")
     df = pd.read_parquet(parquet_file)
-    print(f"Loaded {len(df):,} samples")
-    print(f"Columns: {df.columns.tolist()}")
+
+    elapsed = time.time() - start
+    logger.info(f"Loaded {len(df):,} samples in {elapsed:.1f}s")
+    logger.info(f"Columns: {df.columns.tolist()}")
+
+    log_step(f"Loading parquet data (took {elapsed:.1f}s)", start=False)
     return df
 
 
-def apply_filters(df: pd.DataFrame, min_hashes: int = 1000, min_diversity: int = 1, 
+def apply_filters(df: pd.DataFrame, min_hashes: int = 1000, min_diversity: int = 1,
                   min_mbases: int = 0) -> pd.DataFrame:
     """Apply quality filters to the data."""
-    print(f"\nApplying filters:")
-    print(f"  Minimum total hashes: {min_hashes:,}")
-    print(f"  Minimum observed richness (KOs): {min_diversity}")
+    log_step("Applying filters")
+    start = time.time()
+
+    logger.info(f"Filter settings:")
+    logger.info(f"  Minimum total hashes: {min_hashes:,}")
+    logger.info(f"  Minimum observed richness (KOs): {min_diversity}")
     if min_mbases > 0:
-        print(f"  Minimum mbases: {min_mbases:,}")
-    
+        logger.info(f"  Minimum mbases: {min_mbases:,}")
+
     original_count = len(df)
-    
+
     # Build filter conditions
     filter_mask = (df['total_distinct_hashes'] >= min_hashes)
-    
+
     # Use observed_richness or alpha_diversity
     if 'observed_richness' in df.columns:
         filter_mask = filter_mask & (df['observed_richness'] >= min_diversity)
     elif 'alpha_diversity' in df.columns:
         filter_mask = filter_mask & (df['alpha_diversity'] >= min_diversity)
-    
+
     # Add mbases filter if column exists and threshold > 0
     if min_mbases > 0 and 'mbases' in df.columns:
         filter_mask = filter_mask & (df['mbases'] >= min_mbases)
     elif min_mbases > 0:
-        print(f"  WARNING: mbases column not found, skipping mbases filter")
-    
+        logger.warning("mbases column not found, skipping mbases filter")
+
     df_filtered = df[filter_mask].copy()
-    
+
     filtered_count = len(df_filtered)
-    print(f"\nFiltering results:")
-    print(f"  Original samples: {original_count:,}")
-    print(f"  After filtering: {filtered_count:,}")
-    print(f"  Removed: {original_count - filtered_count:,} ({100*(original_count-filtered_count)/original_count:.1f}%)")
-    
+    elapsed = time.time() - start
+
+    logger.info(f"Filtering results:")
+    logger.info(f"  Original samples: {original_count:,}")
+    logger.info(f"  After filtering: {filtered_count:,}")
+    logger.info(
+        f"  Removed: {original_count - filtered_count:,} ({100 * (original_count - filtered_count) / original_count:.1f}%)")
+
+    log_step(f"Applying filters (took {elapsed:.1f}s)", start=False)
     return df_filtered
 
 
 def join_metadata(df: pd.DataFrame, metadata_db: str) -> pd.DataFrame:
     """Join with metadata database to get additional sample information."""
-    print(f"\nJoining with metadata from: {metadata_db}")
-    
+    log_step("Joining with metadata")
+    start = time.time()
+
+    logger.info(f"Metadata database: {metadata_db}")
+
     conn = duckdb.connect(metadata_db, read_only=True, config={'threads': 1})
-    
+
     # Get metadata for samples
     accessions = df['accession'].tolist()
     accessions_str = "','".join(accessions)
-    
+
     query = f"""
     SELECT 
         acc,
@@ -146,46 +193,67 @@ def join_metadata(df: pd.DataFrame, metadata_db: str) -> pd.DataFrame:
     FROM metadata_geo_joined 
     WHERE acc IN ('{accessions_str}')
     """
-    
+
+    logger.info(f"Querying metadata for {len(accessions):,} samples...")
     metadata_df = conn.execute(query).fetchdf()
     conn.close()
-    
+
     # Merge with original data
+    logger.info("Merging with original data...")
     df_merged = df.merge(metadata_df, left_on='accession', right_on='acc', how='left')
     df_merged = df_merged.drop('acc', axis=1)
-    
-    print(f"Successfully joined metadata for {len(df_merged):,} samples")
-    print(f"New columns: {[c for c in df_merged.columns if c not in df.columns]}")
-    
+
+    elapsed = time.time() - start
+    logger.info(f"Successfully joined metadata for {len(df_merged):,} samples")
+    logger.info(f"New columns: {[c for c in df_merged.columns if c not in df.columns]}")
+
+    log_step(f"Joining with metadata (took {elapsed:.1f}s)", start=False)
     return df_merged
 
 
-def calculate_metrics(x: np.ndarray, y: np.ndarray) -> dict:
-    """Calculate all correlation metrics."""
+def calculate_metrics(x: np.ndarray, y: np.ndarray, max_samples_expensive: int = 50000) -> dict:
+    """
+    Calculate all correlation metrics.
+
+    Args:
+        x, y: Arrays to correlate
+        max_samples_expensive: Max samples for expensive calculations (dcor, MIC)
+    """
     n = len(x)
-    
+
+    # Fast correlations on full data
     pearson_r, pearson_p = pearsonr(x, y)
     spearman_r, spearman_p = spearmanr(x, y)
     kendall_tau, kendall_p = kendalltau(x, y)
-    
+
+    # Subsample for expensive correlations if needed
+    if n > max_samples_expensive:
+        np.random.seed(42)
+        indices = np.random.choice(n, max_samples_expensive, replace=False)
+        x_sub = x[indices]
+        y_sub = y[indices]
+    else:
+        x_sub = x
+        y_sub = y
+
     if HAS_DCOR:
         try:
-            distance_corr = dcor.distance_correlation(x, y, method='AVL')
+            distance_corr = dcor.distance_correlation(x_sub, y_sub, method='AVL')
         except:
             distance_corr = np.nan
     else:
         distance_corr = np.nan
-    
-    if HAS_MINE and n >= 50:
+
+    if HAS_MINE and len(x_sub) >= 50:
         try:
             mine = MINE(alpha=0.6, c=15)
-            mine.compute_score(x, y)
+            mine.compute_score(x_sub, y_sub)
             mic_score = mine.mic()
         except:
             mic_score = np.nan
     else:
         mic_score = np.nan
-    
+
     X = x.reshape(-1, 1)
     model = LinearRegression()
     model.fit(X, y)
@@ -193,7 +261,7 @@ def calculate_metrics(x: np.ndarray, y: np.ndarray) -> dict:
     r2 = r2_score(y, y_pred)
     slope = model.coef_[0]
     intercept = model.intercept_
-    
+
     return {
         'n': n,
         'pearson_r': pearson_r,
@@ -210,37 +278,39 @@ def calculate_metrics(x: np.ndarray, y: np.ndarray) -> dict:
     }
 
 
-def plot_filtered_correlation(df: pd.DataFrame, output_dir: Path, label: str = "filtered"):
+def plot_filtered_correlation(df: pd.DataFrame, output_dir: Path, label: str = "filtered",
+                              max_samples_expensive: int = 50000):
     """Create correlation plots for all diversity metrics."""
-    
-    print(f"\nCreating correlation plots for {label} data...")
-    
+    log_step(f"Creating correlation plots ({label})")
+    step_start = time.time()
+
     all_stats = {}
-    
+
     for metric_col, metric_name in DIVERSITY_METRICS:
         if metric_col not in df.columns:
-            print(f"  Skipping {metric_name}: column not found")
+            logger.warning(f"Skipping {metric_name}: column not found")
             continue
-        
+
         df_clean = df.dropna(subset=['hashes_per_mb', metric_col])
-        
+
         if len(df_clean) < 10:
-            print(f"  Skipping {metric_name}: insufficient data (n={len(df_clean)})")
+            logger.warning(f"Skipping {metric_name}: insufficient data (n={len(df_clean)})")
             continue
-        
-        print(f"\n  Processing: {metric_name}")
-        
+
+        metric_start = time.time()
+        logger.info(f"Processing: {metric_name} (n={len(df_clean):,})")
+
         x = df_clean['hashes_per_mb'].values
         y = df_clean[metric_col].values
-        
-        metrics = calculate_metrics(x, y)
+
+        metrics = calculate_metrics(x, y, max_samples_expensive)
         all_stats[metric_col] = metrics
-        
+
         # Create plot
         fig, ax = plt.subplots(figsize=(12, 9))
-        
+
         ax.scatter(x, y, alpha=0.3, s=20, c='steelblue', edgecolors='none', rasterized=True)
-        
+
         # Regression line
         X = x.reshape(-1, 1)
         model = LinearRegression()
@@ -248,14 +318,14 @@ def plot_filtered_correlation(df: pd.DataFrame, output_dir: Path, label: str = "
         y_pred = model.predict(X)
         sort_idx = np.argsort(x)
         ax.plot(x[sort_idx], y_pred[sort_idx], 'r-', linewidth=2, label='Linear fit', zorder=10)
-        
+
         # Labels
-        ax.set_xlabel('Functional k-mer hash density per megabase\n(11-mer AA FracMinHash, scale=1000)', 
+        ax.set_xlabel('Functional k-mer hash density per megabase\n(11-mer AA FracMinHash, scale=1000)',
                       fontsize=14, fontweight='bold')
         ax.set_ylabel(metric_name, fontsize=14, fontweight='bold')
         ax.set_title(f'Correlation: Hash Density vs {metric_name}\n({label})\nn = {len(df_clean):,}',
                      fontsize=16, fontweight='bold', pad=20)
-        
+
         # Stats box
         stats_text = f'n = {metrics["n"]:,}\n\n'
         stats_text += 'Linear:\n'
@@ -270,65 +340,70 @@ def plot_filtered_correlation(df: pd.DataFrame, output_dir: Path, label: str = "
             stats_text += f'  Distance corr = {metrics["distance_corr"]:.4f}\n'
         if not np.isnan(metrics['mic']):
             stats_text += f'  MIC = {metrics["mic"]:.4f}'
-        
+
         ax.text(0.05, 0.95, stats_text, transform=ax.transAxes,
                 fontsize=11, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
                 family='monospace')
-        
+
         ax.legend(loc='lower right', fontsize=12)
         ax.grid(True, alpha=0.3)
-        
+
         plt.tight_layout()
         safe_name = metric_col.replace('/', '_').replace(' ', '_')
         plot_file = output_dir / f"correlation_{label}_{safe_name}.png"
         plt.savefig(plot_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
-        print(f"    Saved: {plot_file.name}")
-        print(f"    Spearman ρ = {metrics['spearman_r']:.4f}")
-        print(f"    Pearson r = {metrics['pearson_r']:.4f}")
-        print(f"    R² = {metrics['r2']:.4f}")
-    
+
+        metric_elapsed = time.time() - metric_start
+        logger.info(f"  Saved: {plot_file.name} (took {metric_elapsed:.1f}s)")
+        logger.info(
+            f"  Spearman ρ={metrics['spearman_r']:.4f}, Pearson r={metrics['pearson_r']:.4f}, R²={metrics['r2']:.4f}")
+
     # Create summary multi-panel figure
+    logger.info("Creating summary panel...")
     create_summary_panel(df, output_dir, label, all_stats)
-    
+
+    step_elapsed = time.time() - step_start
+    log_step(f"Creating correlation plots (took {step_elapsed:.1f}s)", start=False)
+
     # Return stats for primary metric (observed_richness_per_mb) for compatibility
-    primary_stats = all_stats.get('observed_richness_per_mb', 
-                                   all_stats.get(list(all_stats.keys())[0] if all_stats else 'n/a', {}))
+    primary_stats = all_stats.get('observed_richness_per_mb',
+                                  all_stats.get(list(all_stats.keys())[0] if all_stats else 'n/a', {}))
     return primary_stats
 
 
 def create_summary_panel(df: pd.DataFrame, output_dir: Path, label: str, all_stats: dict):
     """Create a summary multi-panel figure for all metrics."""
-    
+
     n_metrics = len(all_stats)
     if n_metrics == 0:
         return
-    
+
     n_cols = min(3, n_metrics)
     n_rows = int(np.ceil(n_metrics / n_cols))
-    
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows))
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
     if n_metrics == 1:
         axes = [axes]
     else:
         axes = axes.flatten()
-    
-    for idx, ((metric_col, metrics), (_, metric_name)) in enumerate(zip(all_stats.items(), 
-                                                                        [(k, v) for k, v in DIVERSITY_METRICS if k in all_stats])):
+
+    for idx, ((metric_col, metrics), (_, metric_name)) in enumerate(zip(all_stats.items(),
+                                                                        [(k, v) for k, v in DIVERSITY_METRICS if
+                                                                         k in all_stats])):
         ax = axes[idx]
         df_clean = df.dropna(subset=['hashes_per_mb', metric_col])
-        
+
         if len(df_clean) < 10:
             ax.text(0.5, 0.5, 'Insufficient data', ha='center', va='center', transform=ax.transAxes)
             continue
-        
+
         x = df_clean['hashes_per_mb'].values
         y = df_clean[metric_col].values
-        
+
         ax.scatter(x, y, alpha=0.3, s=10, c='steelblue', edgecolors='none', rasterized=True)
-        
+
         # Regression line
         X = x.reshape(-1, 1)
         model = LinearRegression()
@@ -336,29 +411,29 @@ def create_summary_panel(df: pd.DataFrame, output_dir: Path, label: str, all_sta
         y_pred = model.predict(X)
         sort_idx = np.argsort(x)
         ax.plot(x[sort_idx], y_pred[sort_idx], 'r-', linewidth=2, alpha=0.8)
-        
+
         # Stats
         stats_text = f"ρ={metrics['spearman_r']:.3f}\nr={metrics['pearson_r']:.3f}\nR²={metrics['r2']:.3f}"
         ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=9,
                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
                 family='monospace')
-        
+
         ax.set_xlabel('Hashes per Mb', fontsize=10)
         short_name = metric_name.replace(' per Mb', '').replace(' (KO count)', '')
         ax.set_ylabel(short_name, fontsize=10)
         ax.set_title(short_name, fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3)
-    
+
     # Hide unused subplots
     for idx in range(len(all_stats), len(axes)):
         axes[idx].set_visible(False)
-    
+
     fig.suptitle(f'Functional Hash-Diversity Correlations ({label})', fontsize=14, fontweight='bold', y=0.995)
-    
+
     plt.tight_layout()
     plt.savefig(output_dir / f"summary_all_metrics_{label}.png", dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"\nSaved summary figure: summary_all_metrics_{label}.png")
+    logger.info(f"Saved summary figure: summary_all_metrics_{label}.png")
 
 
 def parse_biome(attributes_json):
@@ -388,19 +463,19 @@ def bin_continuous_variable(series: pd.Series, var_name: str) -> pd.Series:
         else:
             labels = ['<10 Mb', '10-100 Mb', '100-1000 Mb', '1-10 Gb', '10-100 Gb', '>100 Gb']
         return pd.cut(series, bins=bins, labels=labels, include_lowest=True)
-    
+
     elif var_name == 'avgspotlen':
         bins = [0, 50, 100, 150, 250, 500, float('inf')]
         labels = ['<50 bp', '50-100 bp', '100-150 bp', '150-250 bp', '250-500 bp', '>500 bp']
         return pd.cut(series, bins=bins, labels=labels, include_lowest=True)
-    
+
     elif var_name == 'releasedate':
         try:
             years = pd.to_datetime(series, errors='coerce').dt.year
             return years.apply(lambda y: f"{int(y)}" if pd.notna(y) else 'unknown')
         except:
             return pd.Series(['unknown'] * len(series))
-    
+
     else:
         return pd.qcut(series, q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'], duplicates='drop')
 
@@ -412,40 +487,41 @@ def consolidate_rare_categories(series: pd.Series, top_n: int = 10, other_label:
     return series.apply(lambda x: x if x in top_categories else other_label)
 
 
-def calculate_category_statistics(df: pd.DataFrame, category_col: str, 
-                                  diversity_col: str, min_samples: int = 30) -> pd.DataFrame:
+def calculate_category_statistics(df: pd.DataFrame, category_col: str,
+                                  diversity_col: str, min_samples: int = 30,
+                                  max_samples_expensive: int = 50000) -> pd.DataFrame:
     """Calculate correlation statistics for each value within a categorical variable."""
-    
+
     if category_col not in df.columns:
         return pd.DataFrame()
-    
+
     df_clean = df[df[category_col].notna()].copy()
-    
+
     if len(df_clean) == 0:
         return pd.DataFrame()
-    
+
     results = []
-    
+
     for category_value in df_clean[category_col].unique():
         category_data = df_clean[df_clean[category_col] == category_value]
-        
+
         if len(category_data) < min_samples:
             continue
-        
+
         category_data = category_data[
-            category_data['hashes_per_mb'].notna() & 
+            category_data['hashes_per_mb'].notna() &
             category_data[diversity_col].notna()
-        ]
-        
+            ]
+
         if len(category_data) < min_samples:
             continue
-        
+
         try:
             x = category_data['hashes_per_mb'].values
             y = category_data[diversity_col].values
-            
-            metrics = calculate_metrics(x, y)
-            
+
+            metrics = calculate_metrics(x, y, max_samples_expensive)
+
             results.append({
                 'variable': category_col,
                 'category': str(category_value),
@@ -453,51 +529,48 @@ def calculate_category_statistics(df: pd.DataFrame, category_col: str,
                 'n_samples': len(category_data),
                 **metrics
             })
-            
+
         except Exception:
             continue
-    
+
     if not results:
         return pd.DataFrame()
-    
+
     return pd.DataFrame(results)
 
 
 def plot_correlation_by_category(df: pd.DataFrame, category_col: str, diversity_col: str,
                                  output_dir: Path, max_categories: int = 10):
     """Create correlation plot colored by a categorical variable."""
-    
-    print(f"\nCreating plot colored by: {category_col} for {diversity_col}")
-    
+
     if category_col not in df.columns or diversity_col not in df.columns:
-        print(f"  Column not found - skipping")
-        return
-    
+        logger.debug(f"Skipping {category_col}/{diversity_col}: column not found")
+        return None
+
     df_plot = df[df[category_col].notna()].copy()
-    
+
     if len(df_plot) == 0:
-        print(f"  No data available - skipping")
-        return
-    
+        logger.debug(f"Skipping {category_col}/{diversity_col}: no data available")
+        return None
+
     category_counts = df_plot[category_col].value_counts()
-    
+
     if len(category_counts) > max_categories:
-        print(f"  {len(category_counts)} categories found, keeping top {max_categories}")
         df_plot[category_col] = consolidate_rare_categories(df_plot[category_col], top_n=max_categories)
         category_counts = df_plot[category_col].value_counts()
-    
+
     fig, ax = plt.subplots(figsize=(14, 8))
-    
+
     colors = sns.color_palette("tab20", n_colors=min(20, len(category_counts)))
-    
+
     for idx, (category, color) in enumerate(zip(category_counts.index, colors)):
         category_data = df_plot[df_plot[category_col] == category]
-        
+
         if len(category_data) == 0:
             continue
-        
+
         label = f"{category} (n={len(category_data):,})"
-        
+
         ax.scatter(
             category_data['hashes_per_mb'],
             category_data[diversity_col],
@@ -507,99 +580,146 @@ def plot_correlation_by_category(df: pd.DataFrame, category_col: str, diversity_
             label=label,
             rasterized=True
         )
-    
-    ax.set_xlabel('Functional k-mer hash density per megabase\n(11-mer AA FracMinHash, scale=1000)', 
+
+    ax.set_xlabel('Functional k-mer hash density per megabase\n(11-mer AA FracMinHash, scale=1000)',
                   fontsize=12, fontweight='bold')
-    
+
     # Get nice name for diversity metric
     metric_names = dict(DIVERSITY_METRICS)
     y_label = metric_names.get(diversity_col, diversity_col)
     ax.set_ylabel(y_label, fontsize=12, fontweight='bold')
-    
+
     title_name = category_col.replace('_', ' ').title()
     ax.set_title(f'Functional Hash-Diversity Correlation by {title_name}',
                  fontsize=14, fontweight='bold', pad=15)
-    
+
     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=9)
     ax.grid(True, alpha=0.3)
-    
+
     plt.tight_layout()
-    
+
     safe_cat = category_col.replace('/', '_').replace(' ', '_')
     safe_div = diversity_col.replace('/', '_').replace(' ', '_')
     plot_file = output_dir / f"correlation_by_{safe_cat}_{safe_div}.png"
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     plt.close()
-    
-    print(f"  Saved: {plot_file.name}")
+
+    return plot_file.name
 
 
-def generate_all_categorical_plots(df: pd.DataFrame, output_dir: Path, filters_applied: dict):
+def _plot_category_task(args: Tuple) -> Optional[str]:
+    """Worker function for parallel categorical plotting."""
+    df_dict, category_col, diversity_col, output_dir_str, max_categories = args
+
+    # Reconstruct DataFrame and Path in worker process
+    df = pd.DataFrame(df_dict)
+    output_dir = Path(output_dir_str)
+
+    try:
+        result = plot_correlation_by_category(df, category_col, diversity_col, output_dir, max_categories)
+        return result
+    except Exception as e:
+        return None
+
+
+def generate_all_categorical_plots(df: pd.DataFrame, output_dir: Path, filters_applied: dict,
+                                   n_jobs: int = 8, max_samples_expensive: int = 50000):
     """Generate correlation plots for all categorical metadata variables and diversity metrics."""
-    
-    print("\n" + "="*70)
-    print("GENERATING CATEGORICAL ANALYSIS")
-    print("="*70)
-    
+
+    log_step("Generating categorical analysis")
+    step_start = time.time()
+
     cat_plot_dir = output_dir / "categorical_plots"
     cat_plot_dir.mkdir(exist_ok=True)
-    
+
     categorical_vars = [
         'center_name',
-        'instrument', 
+        'instrument',
         'librarylayout',
         'libraryselection',
         'librarysource',
         'platform',
         'organism'
     ]
-    
+
     # Parse biome if needed
     if 'biome' in df.columns:
-        print("\nFilling missing biome values from attributes...")
+        logger.info("Filling missing biome values from attributes...")
         if 'attributes' in df.columns:
             missing_biome = df['biome'].isna()
             df.loc[missing_biome, 'biome'] = df.loc[missing_biome, 'attributes'].apply(parse_biome)
-            print(f"  Biome filled for {missing_biome.sum():,} samples")
+            logger.info(f"  Biome filled for {missing_biome.sum():,} samples")
         categorical_vars.append('biome')
     elif 'attributes' in df.columns:
-        print("\nParsing biome from attributes...")
+        logger.info("Parsing biome from attributes...")
         df['biome'] = df['attributes'].apply(parse_biome)
         categorical_vars.append('biome')
-    
+
     # Bin continuous variables
     continuous_to_bin = {
         'mbytes': 'mbytes',
-        'mbases': 'mbases', 
+        'mbases': 'mbases',
         'avgspotlen': 'avgspotlen',
         'releasedate': 'releasedate'
     }
-    
+
     for var_name, col_name in continuous_to_bin.items():
         if col_name in df.columns:
-            print(f"Binning {var_name}...")
+            logger.info(f"Binning {var_name}...")
             df[f'{var_name}_binned'] = bin_continuous_variable(df[col_name], var_name)
             categorical_vars.append(f'{var_name}_binned')
-    
-    # Generate plots for each diversity metric and categorical variable combination
-    # Focus on the main diversity metric: observed_richness_per_mb
-    primary_metric = 'observed_richness_per_mb'
-    if primary_metric in df.columns:
-        print(f"\nGenerating categorical plots for: {primary_metric}")
+
+    # Collect all plotting tasks
+    plot_tasks = []
+    metrics_to_plot = ['observed_richness_per_mb', 'shannon_index']
+
+    for metric in metrics_to_plot:
+        if metric not in df.columns:
+            continue
         for var in categorical_vars:
-            plot_correlation_by_category(df, var, primary_metric, cat_plot_dir)
-    
-    # Also generate for Shannon index as it's commonly used
-    shannon_metric = 'shannon_index'
-    if shannon_metric in df.columns:
-        print(f"\nGenerating categorical plots for: {shannon_metric}")
-        for var in categorical_vars:
-            plot_correlation_by_category(df, var, shannon_metric, cat_plot_dir)
-    
-    print("\n" + "="*70)
-    print(f"CATEGORICAL ANALYSIS COMPLETE")
-    print(f"Results saved to: {cat_plot_dir}/")
-    print("="*70)
+            if var in df.columns:
+                plot_tasks.append((var, metric))
+
+    logger.info(f"Generating {len(plot_tasks)} categorical plots using {n_jobs} workers...")
+
+    # Convert DataFrame to dict for pickling (needed for multiprocessing)
+    # Only include columns we need to reduce memory
+    needed_cols = set(['hashes_per_mb'] + metrics_to_plot + categorical_vars)
+    needed_cols = [c for c in needed_cols if c in df.columns]
+    df_subset = df[needed_cols].copy()
+
+    # Execute plots in parallel
+    completed = 0
+    failed = 0
+
+    with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+        futures = {}
+        for var, metric in plot_tasks:
+            # Submit task - pass DataFrame as dict for pickling
+            future = executor.submit(
+                _plot_category_task,
+                (df_subset.to_dict('list'), var, metric, str(cat_plot_dir), 10)
+            )
+            futures[future] = (var, metric)
+
+        for future in as_completed(futures):
+            var, metric = futures[future]
+            try:
+                result = future.result()
+                if result:
+                    completed += 1
+                    logger.debug(f"  Completed: {result}")
+                else:
+                    failed += 1
+            except Exception as e:
+                failed += 1
+                logger.warning(f"  Failed {var}/{metric}: {e}")
+
+    step_elapsed = time.time() - step_start
+    logger.info(f"Categorical plots: {completed} completed, {failed} skipped/failed")
+    logger.info(f"Results saved to: {cat_plot_dir}/")
+
+    log_step(f"Categorical analysis (took {step_elapsed:.1f}s)", start=False)
 
 
 def main():
@@ -609,44 +729,61 @@ def main():
     )
     parser.add_argument('--input', '-i', required=True, help='Input parquet file')
     parser.add_argument('--output', '-o', required=True, help='Output directory')
-    parser.add_argument('--min-hashes', type=int, default=1000, 
-                       help='Minimum total distinct hashes')
+    parser.add_argument('--min-hashes', type=int, default=1000,
+                        help='Minimum total distinct hashes')
     parser.add_argument('--min-diversity', type=int, default=1,
-                       help='Minimum observed richness (KO count)')
+                        help='Minimum observed richness (KO count)')
     parser.add_argument('--min-mbases', type=int, default=0,
-                       help='Minimum sequencing depth in megabases (0 = no filter)')
-    parser.add_argument('--metadata-db', 
-                       default='/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined_5M.duckdb',
-                       help='Path to metadata database')
+                        help='Minimum sequencing depth in megabases (0 = no filter)')
+    parser.add_argument('--metadata-db',
+                        default='/scratch/shared_data_new/Logan_yacht_data/metadata/aws_sra_metadata/metadata_geo_joined_5M.duckdb',
+                        help='Path to metadata database')
     parser.add_argument('--join-metadata', action='store_true',
-                       help='Join with metadata database')
-    
+                        help='Join with metadata database')
+    parser.add_argument('--n-jobs', '-j', type=int, default=8,
+                        help='Number of parallel workers for plotting')
+    parser.add_argument('--max-corr-samples', type=int, default=50000,
+                        help='Max samples for expensive correlations (dcor, MIC)')
+
     args = parser.parse_args()
-    
+
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    print("="*70)
-    print("FUNCTIONAL DIVERSITY DOWNSTREAM ANALYSIS")
-    print("="*70)
-    
+
+    total_start = time.time()
+
+    logger.info("=" * 70)
+    logger.info("FUNCTIONAL DIVERSITY DOWNSTREAM ANALYSIS")
+    logger.info("=" * 70)
+    logger.info(f"Configuration:")
+    logger.info(f"  Input: {args.input}")
+    logger.info(f"  Output: {args.output}")
+    logger.info(f"  Min hashes: {args.min_hashes:,}")
+    logger.info(f"  Min diversity: {args.min_diversity}")
+    logger.info(f"  Min mbases: {args.min_mbases}")
+    logger.info(f"  Join metadata: {args.join_metadata}")
+    logger.info(f"  Parallel workers: {args.n_jobs}")
+    logger.info(f"  Max samples for dcor/MIC: {args.max_corr_samples:,}")
+    logger.info("=" * 70)
+
     # Load data
     df = load_parquet_data(Path(args.input))
-    
+
     # Apply filters
     df_filtered = apply_filters(df, args.min_hashes, args.min_diversity, args.min_mbases)
-    
+
     # Join metadata if requested
     if args.join_metadata:
         df_filtered = join_metadata(df_filtered, args.metadata_db)
-    
+
     # Create plots
     label_parts = [f"min{args.min_hashes}hashes"]
     if args.min_mbases > 0:
         label_parts.append(f"min{args.min_mbases}mbases")
     label = "_".join(label_parts)
-    stats = plot_filtered_correlation(df_filtered, output_dir, label=label)
-    
+    stats = plot_filtered_correlation(df_filtered, output_dir, label=label,
+                                      max_samples_expensive=args.max_corr_samples)
+
     if args.join_metadata:
         filters_applied = {
             'min_hashes': args.min_hashes,
@@ -655,18 +792,23 @@ def main():
             'n_samples_after_filtering': len(df_filtered),
             'input_file': args.input
         }
-        generate_all_categorical_plots(df_filtered, output_dir, filters_applied)
-    
+        generate_all_categorical_plots(df_filtered, output_dir, filters_applied,
+                                       n_jobs=args.n_jobs,
+                                       max_samples_expensive=args.max_corr_samples)
+
     # Save filtered data
+    log_step("Saving outputs")
+    save_start = time.time()
+
     output_file = output_dir / "filtered_data.parquet"
     df_filtered.to_parquet(output_file, index=False)
-    print(f"\nSaved filtered data to: {output_file}")
-    
+    logger.info(f"Saved filtered data to: {output_file}")
+
     # Save summary
     summary_file = output_dir / "summary.txt"
     with open(summary_file, 'w') as f:
         f.write("FUNCTIONAL DIVERSITY FILTERED DATA SUMMARY\n")
-        f.write("="*70 + "\n\n")
+        f.write("=" * 70 + "\n\n")
         f.write(f"Input file: {args.input}\n")
         f.write(f"Filters:\n")
         f.write(f"  Minimum hashes: {args.min_hashes:,}\n")
@@ -679,12 +821,18 @@ def main():
             f.write(f"  Spearman ρ (richness): {stats.get('spearman_r', 'N/A')}\n")
             f.write(f"  Pearson r (richness): {stats.get('pearson_r', 'N/A')}\n")
             f.write(f"  R² (richness): {stats.get('r2', 'N/A')}\n")
-    
-    print(f"Saved summary to: {summary_file}")
-    
-    print("\n" + "="*70)
-    print("ANALYSIS COMPLETE")
-    print("="*70)
+
+    logger.info(f"Saved summary to: {summary_file}")
+
+    save_elapsed = time.time() - save_start
+    log_step(f"Saving outputs (took {save_elapsed:.1f}s)", start=False)
+
+    total_elapsed = time.time() - total_start
+    logger.info("=" * 70)
+    logger.info("ANALYSIS COMPLETE")
+    logger.info("=" * 70)
+    logger.info(f"Total time: {total_elapsed / 60:.1f} minutes")
+    logger.info(f"Outputs saved to: {output_dir}/")
 
 
 if __name__ == "__main__":

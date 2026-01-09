@@ -7,6 +7,10 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="/scratch/dmk333_new/Logan/Logan_Analyses/verify_functional_diversity_correlation/data"
 
+# Parallelization settings
+N_JOBS=16
+MAX_CORR_SAMPLES=50000
+
 # Standard filter: min 1620 mbases, min 10 KOs (functional diversity)
 echo "Running filtered analysis with min_mbases=1620, min_diversity=10..."
 python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
@@ -14,7 +18,9 @@ python3 "${SCRIPT_DIR}/functional_analyze_parquet_data.py" \
     --output "${BASE_DIR}/functional_hash_diversity_results/analysis/filtered_analysis_min_mbases_1620_min_diversity_10" \
     --min-mbases 1620 \
     --min-diversity 10 \
-    --join-metadata
+    --join-metadata \
+    --n-jobs ${N_JOBS} \
+    --max-corr-samples ${MAX_CORR_SAMPLES}
 
 #echo ""
 #echo "Running filtered analysis with min_hashes=10000, min_diversity=10..."
