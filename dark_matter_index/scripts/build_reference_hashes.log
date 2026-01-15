@@ -1,0 +1,11 @@
+nohup: ignoring input
+2026-01-15 14:36:52,859 - INFO - Found 10 reference databases
+2026-01-15 14:36:52,859 - INFO - Using IN-MEMORY build (fastest, requires ~250GB+ RAM)
+2026-01-15 14:36:52,859 - INFO - ksize=31
+2026-01-15 14:36:52,859 - INFO - Streaming from GenBank WGS (/scratch/dmk333_new/known_microbe_hashes/GenBankWGS/data/wgs_unique_hashes.db)
+2026-01-15 14:36:53,611 - INFO - Executing query: 
+            SELECT hash
+            FROM unique_hashes
+            WHERE ksize = 31
+        ...
+2026-01-15 14:39:20,541 - INFO -   Fetched 500,000,000 hashes from GenBank WGS
