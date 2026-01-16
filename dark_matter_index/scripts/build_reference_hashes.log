@@ -9,3 +9,15 @@ nohup: ignoring input
             WHERE ksize = 31
         ...
 2026-01-15 14:39:20,541 - INFO -   Fetched 500,000,000 hashes from GenBank WGS
+2026-01-15 14:41:44,878 - INFO -   Fetched 1,000,000,000 hashes from GenBank WGS
+2026-01-15 14:44:12,125 - INFO -   Fetched 1,500,000,000 hashes from GenBank WGS
+2026-01-15 14:46:32,691 - INFO -   Fetched 2,000,000,000 hashes from GenBank WGS
+2026-01-15 14:49:00,825 - INFO -   Fetched 2,500,000,000 hashes from GenBank WGS
+2026-01-15 14:51:24,883 - INFO -   Fetched 3,000,000,000 hashes from GenBank WGS
+2026-01-15 14:53:49,106 - INFO -   Fetched 3,500,000,000 hashes from GenBank WGS
+2026-01-15 14:56:09,402 - INFO -   Fetched 4,000,000,000 hashes from GenBank WGS
+2026-01-15 14:58:32,124 - INFO -   Fetched 4,500,000,000 hashes from GenBank WGS
+2026-01-15 15:00:54,012 - INFO -   Fetched 5,000,000,000 hashes from GenBank WGS
+2026-01-15 15:03:16,607 - INFO -   Fetched 5,500,000,000 hashes from GenBank WGS
+2026-01-15 15:05:35,077 - INFO -   Fetched 6,000,000,000 hashes from GenBank WGS
+./build_reference_hashes.sh: line 2: 1858820 Killed                  python build_reference_hashes.py --ksize 31 --method inmemory /scratch/dmk333_new/known_microbe_hashes/DB_info.json /scratch/dmk333_new/Logan/Logan_Analyses/dark_matter_index/data
