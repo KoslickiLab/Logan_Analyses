@@ -404,7 +404,8 @@ Example:
             logger.info("Skipping reference hash loading (--skip-reference)")
         
         # Step 3: Create indexes
-        create_indexes(output_db)
+        logger.info("Skipping the index creation since it takes way too long and isn't actually needed")
+        #create_indexes(output_db)
         
         # Step 4: Analyze tables
         analyze_database(output_db)
