@@ -117,6 +117,73 @@ def verify_host_database(host_db_path: str) -> int:
         conn.close()
 
 
+def load_organisms_from_file(filepath: str) -> List[str]:
+    """
+    Load organism names from a file (one per line).
+    
+    Args:
+        filepath: Path to file with organism names
+        
+    Returns:
+        List of organism names (stripped, non-empty lines)
+    """
+    organisms = []
+    with open(filepath, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):  # Skip empty lines and comments
+                organisms.append(line)
+    return organisms
+
+
+def parse_organisms_arg(organisms_arg: Optional[List[str]], organisms_file: Optional[str]) -> Optional[List[str]]:
+    """
+    Parse organisms from either command line or file.
+    
+    Handles comma-separated values if passed as a single string.
+    
+    Args:
+        organisms_arg: List from --organisms argument
+        organisms_file: Path from --organisms-file argument
+        
+    Returns:
+        List of organism names, or None if no filter
+    """
+    organisms = []
+    
+    # Load from file if specified
+    if organisms_file:
+        if not Path(organisms_file).exists():
+            logger.error(f"Organisms file not found: {organisms_file}")
+            sys.exit(1)
+        file_organisms = load_organisms_from_file(organisms_file)
+        logger.info(f"Loaded {len(file_organisms)} organisms from {organisms_file}")
+        organisms.extend(file_organisms)
+    
+    # Process command line arguments
+    if organisms_arg:
+        for org in organisms_arg:
+            # Handle comma-separated values
+            if ',' in org:
+                organisms.extend([o.strip() for o in org.split(',') if o.strip()])
+            else:
+                organisms.append(org)
+    
+    if not organisms:
+        return None
+    
+    # Deduplicate while preserving order
+    seen = set()
+    unique_organisms = []
+    for org in organisms:
+        org_lower = org.lower()
+        if org_lower not in seen:
+            seen.add(org_lower)
+            unique_organisms.append(org)
+    
+    return unique_organisms
+
+
 def filter_samples_by_organism(
     input_parquet: str,
     organisms: Optional[List[str]] = None,
@@ -148,7 +215,9 @@ def filter_samples_by_organism(
         return df
     
     # Filter by organism
-    logger.info(f"Filtering by organisms: {organisms}")
+    logger.info(f"Filtering by {len(organisms)} organism type(s):")
+    for org in organisms:
+        logger.info(f"  - {org}")
     
     # Create case-insensitive filter
     organisms_lower = [o.lower() for o in organisms]
@@ -157,6 +226,14 @@ def filter_samples_by_organism(
     df_filtered = df[mask].copy()
     
     logger.info(f"Samples after organism filter: {len(df_filtered):,}")
+    
+    # Show breakdown by organism
+    if len(df_filtered) > 0:
+        logger.info("Samples per organism type:")
+        for org in organisms:
+            count = (df_filtered[organism_column].str.lower() == org.lower()).sum()
+            if count > 0:
+                logger.info(f"  - {org}: {count:,}")
     
     if len(df_filtered) == 0:
         logger.warning("No samples match the organism filter!")
@@ -348,15 +425,22 @@ def compute_dmi_sql_with_host_removal(
     return result_df
 
 
-def print_summary_statistics(df: pd.DataFrame, dmi_results: pd.DataFrame):
+def print_summary_statistics(df: pd.DataFrame):
     """
     Print comprehensive summary statistics.
+    
+    Args:
+        df: DataFrame with DMI results already merged in (df_output)
     """
     logger.info("\n" + "="*60)
     logger.info("DMI SUMMARY (Host Contamination Removed)")
     logger.info("="*60)
     
-    valid_dmi = dmi_results['dmi'].dropna()
+    if 'dmi' not in df.columns:
+        logger.warning("No 'dmi' column found in output - skipping summary")
+        return
+    
+    valid_dmi = df['dmi'].dropna()
     
     if len(valid_dmi) == 0:
         logger.warning("No valid DMI values computed!")
@@ -381,47 +465,67 @@ def print_summary_statistics(df: pd.DataFrame, dmi_results: pd.DataFrame):
     logger.info(f"  DMI >= 0.7: {(valid_dmi >= 0.7).sum():,} ({100*(valid_dmi >= 0.7).mean():.1f}%)")
     
     # Host contamination statistics
-    if 'host_fraction' in dmi_results.columns:
-        valid_host = dmi_results['host_fraction'].dropna()
-        logger.info(f"\nHost Contamination Statistics:")
-        logger.info(f"  Mean host fraction:   {valid_host.mean():.4f} ({100*valid_host.mean():.2f}%)")
-        logger.info(f"  Median host fraction: {valid_host.median():.4f} ({100*valid_host.median():.2f}%)")
-        logger.info(f"  Max host fraction:    {valid_host.max():.4f} ({100*valid_host.max():.2f}%)")
-        
-        # Host contamination distribution
-        logger.info("\nHost Contamination Distribution:")
-        logger.info(f"  < 1%:  {(valid_host < 0.01).sum():,} ({100*(valid_host < 0.01).mean():.1f}%)")
-        logger.info(f"  1-5%:  {((valid_host >= 0.01) & (valid_host < 0.05)).sum():,} ({100*((valid_host >= 0.01) & (valid_host < 0.05)).mean():.1f}%)")
-        logger.info(f"  5-10%: {((valid_host >= 0.05) & (valid_host < 0.10)).sum():,} ({100*((valid_host >= 0.05) & (valid_host < 0.10)).mean():.1f}%)")
-        logger.info(f"  > 10%: {(valid_host >= 0.10).sum():,} ({100*(valid_host >= 0.10).mean():.1f}%)")
+    if 'host_fraction' in df.columns:
+        valid_host = df['host_fraction'].dropna()
+        if len(valid_host) > 0:
+            logger.info(f"\nHost Contamination Statistics:")
+            logger.info(f"  Mean host fraction:   {valid_host.mean():.4f} ({100*valid_host.mean():.2f}%)")
+            logger.info(f"  Median host fraction: {valid_host.median():.4f} ({100*valid_host.median():.2f}%)")
+            logger.info(f"  Max host fraction:    {valid_host.max():.4f} ({100*valid_host.max():.2f}%)")
+            
+            # Host contamination distribution
+            logger.info("\nHost Contamination Distribution:")
+            logger.info(f"  < 1%:  {(valid_host < 0.01).sum():,} ({100*(valid_host < 0.01).mean():.1f}%)")
+            logger.info(f"  1-5%:  {((valid_host >= 0.01) & (valid_host < 0.05)).sum():,} ({100*((valid_host >= 0.01) & (valid_host < 0.05)).mean():.1f}%)")
+            logger.info(f"  5-10%: {((valid_host >= 0.05) & (valid_host < 0.10)).sum():,} ({100*((valid_host >= 0.05) & (valid_host < 0.10)).mean():.1f}%)")
+            logger.info(f"  > 10%: {(valid_host >= 0.10).sum():,} ({100*(valid_host >= 0.10).mean():.1f}%)")
     
     # Hash statistics
-    if 'total_hashes_original' in dmi_results.columns and 'total_hashes' in dmi_results.columns:
-        orig_hashes = dmi_results['total_hashes_original'].sum()
-        final_hashes = dmi_results['total_hashes'].sum()
+    if 'total_hashes_original' in df.columns and 'total_hashes_dmi' in df.columns:
+        orig_hashes = df['total_hashes_original'].sum()
+        final_hashes = df['total_hashes_dmi'].sum()
         removed_hashes = orig_hashes - final_hashes
         
-        logger.info(f"\nHash Statistics:")
-        logger.info(f"  Original total hashes: {orig_hashes:,}")
-        logger.info(f"  Host hashes removed:   {removed_hashes:,} ({100*removed_hashes/orig_hashes:.2f}%)")
-        logger.info(f"  Final hashes for DMI:  {final_hashes:,}")
+        if orig_hashes > 0:
+            logger.info(f"\nHash Statistics:")
+            logger.info(f"  Original total hashes: {orig_hashes:,}")
+            logger.info(f"  Host hashes removed:   {removed_hashes:,} ({100*removed_hashes/orig_hashes:.2f}%)")
+            logger.info(f"  Final hashes for DMI:  {final_hashes:,}")
     
     # By organism if available
     if 'organism' in df.columns:
-        merged = df.merge(dmi_results[['accession', 'dmi', 'host_fraction']], on='accession', how='inner')
+        # Filter to rows with valid DMI
+        df_valid = df[df['dmi'].notna()].copy()
         
-        logger.info("\nTop 10 organisms by sample count:")
-        organism_stats = merged.groupby('organism').agg({
-            'dmi': ['median', 'mean', 'count'],
-            'host_fraction': 'median'
-        })
-        organism_stats.columns = ['dmi_median', 'dmi_mean', 'count', 'host_median']
-        organism_stats = organism_stats.sort_values('count', ascending=False).head(10)
-        
-        for org, row in organism_stats.iterrows():
-            logger.info(f"  {org}: n={int(row['count']):,}, "
-                       f"DMI median={row['dmi_median']:.4f}, "
-                       f"host median={row['host_median']:.4f}")
+        if len(df_valid) > 0:
+            logger.info("\nTop 10 organisms by sample count:")
+            
+            # Build aggregation based on available columns
+            agg_dict = {'dmi': ['median', 'mean', 'count']}
+            if 'host_fraction' in df_valid.columns:
+                agg_dict['host_fraction'] = 'median'
+            
+            try:
+                organism_stats = df_valid.groupby('organism').agg(agg_dict)
+                
+                # Flatten multi-level column names
+                organism_stats.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col 
+                                          for col in organism_stats.columns]
+                
+                organism_stats = organism_stats.sort_values('dmi_count', ascending=False).head(10)
+                
+                for org, row in organism_stats.iterrows():
+                    count = int(row['dmi_count'])
+                    dmi_med = row['dmi_median']
+                    
+                    if 'host_fraction_median' in row.index and pd.notna(row['host_fraction_median']):
+                        logger.info(f"  {org}: n={count:,}, "
+                                   f"DMI median={dmi_med:.4f}, "
+                                   f"host median={row['host_fraction_median']:.4f}")
+                    else:
+                        logger.info(f"  {org}: n={count:,}, DMI median={dmi_med:.4f}")
+            except Exception as e:
+                logger.warning(f"Could not compute organism statistics: {e}")
 
 
 def main():
@@ -447,21 +551,21 @@ Output columns added to parquet:
     - unmapped_hashes: Non-host hashes not in reference
 
 Examples:
-    # Filter for human gut metagenomes only
+    # RECOMMENDED: Use a file with organism names (one per line)
     python compute_dmi_host_filtered.py \\
         --database dmi_database.db \\
         --host-hashes human_hashes.db \\
         --input filtered_data.parquet \\
         --output filtered_data_with_dmi_host_removed.parquet \\
-        --organisms "human gut metagenome"
+        --organisms-file human_organisms.txt
 
-    # Multiple organism types
+    # Alternative: Comma-separated format (avoids shell quoting issues)
     python compute_dmi_host_filtered.py \\
         --database dmi_database.db \\
         --host-hashes human_hashes.db \\
         --input filtered_data.parquet \\
         --output filtered_data_with_dmi_host_removed.parquet \\
-        --organisms "human gut metagenome" "human feces metagenome" "human skin metagenome"
+        --organisms "human gut metagenome,human feces metagenome,human skin metagenome"
 
     # All samples (no organism filter)
     python compute_dmi_host_filtered.py \\
@@ -470,14 +574,13 @@ Examples:
         --input filtered_data.parquet \\
         --output filtered_data_with_dmi_host_removed.parquet
 
-    # Use chunked processing for progress feedback
+    # List available organisms in data
     python compute_dmi_host_filtered.py \\
         --database dmi_database.db \\
         --host-hashes human_hashes.db \\
         --input filtered_data.parquet \\
-        --output filtered_data_with_dmi_host_removed.parquet \\
-        --organisms "human gut metagenome" \\
-        --chunked --chunk-size 5000
+        --output out.parquet \\
+        --list-organisms
         """
     )
     
@@ -505,8 +608,16 @@ Examples:
         "--organisms",
         nargs='+',
         default=None,
-        help="Organism types to include (e.g., 'human gut metagenome'). "
-             "If not specified, all samples are processed."
+        help="Organism types to include. Use quotes around multi-word names or "
+             "use comma-separated format: 'human gut metagenome,human feces metagenome'. "
+             "Alternatively, use --organisms-file for a file-based list."
+    )
+    parser.add_argument(
+        "--organisms-file",
+        default=None,
+        help="Path to file with organism names (one per line). "
+             "Lines starting with # are treated as comments. "
+             "Can be combined with --organisms."
     )
     parser.add_argument(
         "--organism-column",
@@ -553,9 +664,15 @@ Examples:
     logger.info(f"Host hashes: {args.host_hashes}")
     logger.info(f"Input: {args.input}")
     logger.info(f"Output: {args.output}")
-    logger.info(f"Organisms filter: {args.organisms or 'all'}")
     logger.info(f"Threads: {args.threads}")
     logger.info(f"Memory: {args.memory}")
+    
+    # Parse organisms from args and/or file
+    organisms = parse_organisms_arg(args.organisms, args.organisms_file)
+    if organisms:
+        logger.info(f"Organism filter: {len(organisms)} type(s)")
+    else:
+        logger.info("Organism filter: none (all samples)")
     
     # Check files exist
     for path, name in [(args.database, "Main database"), 
@@ -592,7 +709,7 @@ Examples:
         # Load and filter input data
         df_input = filter_samples_by_organism(
             args.input,
-            args.organisms,
+            organisms,  # Use parsed organisms list
             args.organism_column
         )
         
@@ -657,7 +774,7 @@ Examples:
             logger.warning(f"{missing_dmi:,} samples have no DMI (not in database)")
         
         # Print summary
-        print_summary_statistics(df_output, dmi_results)
+        print_summary_statistics(df_output)
         
         # Save output
         logger.info(f"\nSaving output to {args.output}")

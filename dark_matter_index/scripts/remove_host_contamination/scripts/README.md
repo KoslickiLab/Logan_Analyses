@@ -1,12 +1,3 @@
-# Script order
-1. `get_T2T.sh`
-2. `get_HPRC_Y1.sh`
-3. `get_HPRC_Y2.sh`
-4. `sketch_human_manysketch.sh`
-5. `run_extract_human_hashes.sh`
-6. `run_compute_dmi_host_filtered.sh`
-
-
 # Host Contamination Removal for DMI Calculation
 
 This directory contains tools to compute the Dark Matter Index (DMI) while excluding host-derived hashes from the calculation. This is essential for human-associated metagenome samples where host contamination would artificially inflate the mapped hash count.
