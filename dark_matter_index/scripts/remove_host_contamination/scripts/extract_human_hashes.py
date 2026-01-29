@@ -177,7 +177,6 @@ def create_hash_database(
             'n_signatures': str(n_signatures),
             'n_unique_hashes': str(len(hashes)),
             'created_at': datetime.now().isoformat(),
-            'sourmash_version': sourmash.__version__
         }
         
         for key, value in metadata.items():

@@ -3,7 +3,8 @@
 2. `get_HPRC_Y1.sh`
 3. `get_HPRC_Y2.sh`
 4. `sketch_human_manysketch.sh`
-5. Then follow the below
+5. `run_extract_human_hashes.sh`
+6. `run_compute_dmi_host_filtered.sh`
 
 
 # Host Contamination Removal for DMI Calculation
