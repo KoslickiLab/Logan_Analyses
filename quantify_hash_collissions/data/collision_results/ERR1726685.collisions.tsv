@@ -1,0 +1,4 @@
+# FracMinHash collision details
+# Each line: a hash value with 2+ distinct canonical k-mers
+# Columns: hash_value TAB kmer1 TAB kmer2 [TAB kmer3 ...]
+13086129273328152	AGTAAAAATAAAGAATTTTCTGACACTTCAG	AGTGGCTTCTCTTCAGAAGCCATCTCTTTCA

@@ -1,0 +1,2 @@
+# the /dev/shm means things are defalated and written to memory, not hammering the SSDs
+nohup bash scripts/run_fmh_collisions.sh -t 100 -o data/collision_results -d /dev/shm/fmh_collisions > scripts/run_fmh_collisions.log 2>&1 &

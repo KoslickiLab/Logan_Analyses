@@ -1,0 +1,2 @@
+# on the 5M merged with geo
+COPY (select acc from metadata_geo_joined where assay_type='WGS' and libraryselection='RANDOM' and mbytes>1000 order by mbytes desc) TO '/scratch/dmk333_new/Logan/quantify_hash_collissions/data/sorted_WGS_accessions.csv' (HEADER, DELIMITER ',');

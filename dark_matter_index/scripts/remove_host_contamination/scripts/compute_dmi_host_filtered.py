@@ -298,6 +298,9 @@ def compute_dmi_with_host_removal(
         # 2. Marks which are host hashes
         # 3. For non-host hashes, marks which are in reference
         # 4. Aggregates by sample
+        #
+        # Output columns use "_host_filtered" suffix to distinguish from
+        # original columns in the input parquet
         query = """
             WITH sample_hash_status AS (
                 SELECT 
@@ -313,18 +316,20 @@ def compute_dmi_with_host_removal(
             SELECT 
                 sample_id AS accession,
                 
-                -- Original counts (before host removal)
+                -- Original counts (before host removal) - for computing host_fraction
                 COUNT(*) AS total_hashes_original,
                 
                 -- Host contamination
                 SUM(is_host) AS host_hashes,
+                SUM(is_host) * 1.0 / COUNT(*) AS host_fraction,
                 
-                -- Non-host counts (used for DMI)
-                SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END) AS total_hashes,
+                -- Non-host counts (used for DMI calculation)
+                -- These use "_host_filtered" suffix to distinguish from original columns
+                SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END) AS total_hashes_host_filtered,
                 
                 -- Reference matching (non-host only)
-                SUM(CASE WHEN is_host = 0 AND is_reference = 1 THEN 1 ELSE 0 END) AS mapped_hashes,
-                SUM(CASE WHEN is_host = 0 AND is_reference = 0 THEN 1 ELSE 0 END) AS unmapped_hashes,
+                SUM(CASE WHEN is_host = 0 AND is_reference = 1 THEN 1 ELSE 0 END) AS mapped_hashes_host_filtered,
+                SUM(CASE WHEN is_host = 0 AND is_reference = 0 THEN 1 ELSE 0 END) AS unmapped_hashes_host_filtered,
                 
                 -- DMI calculation (based on non-host hashes only)
                 CASE 
@@ -332,10 +337,7 @@ def compute_dmi_with_host_removal(
                     THEN SUM(CASE WHEN is_host = 0 AND is_reference = 0 THEN 1 ELSE 0 END) * 1.0 
                          / SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END)
                     ELSE NULL 
-                END AS dmi,
-                
-                -- Host contamination fraction
-                SUM(is_host) * 1.0 / COUNT(*) AS host_fraction
+                END AS dmi_host_filtered
                 
             FROM sample_hash_status
             GROUP BY sample_id
@@ -401,16 +403,16 @@ def compute_dmi_sql_with_host_removal(
             sample_id AS accession,
             COUNT(*) AS total_hashes_original,
             SUM(is_host) AS host_hashes,
-            SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END) AS total_hashes,
-            SUM(CASE WHEN is_host = 0 AND is_reference = 1 THEN 1 ELSE 0 END) AS mapped_hashes,
-            SUM(CASE WHEN is_host = 0 AND is_reference = 0 THEN 1 ELSE 0 END) AS unmapped_hashes,
+            SUM(is_host) * 1.0 / COUNT(*) AS host_fraction,
+            SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END) AS total_hashes_host_filtered,
+            SUM(CASE WHEN is_host = 0 AND is_reference = 1 THEN 1 ELSE 0 END) AS mapped_hashes_host_filtered,
+            SUM(CASE WHEN is_host = 0 AND is_reference = 0 THEN 1 ELSE 0 END) AS unmapped_hashes_host_filtered,
             CASE 
                 WHEN SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END) > 0 
                 THEN SUM(CASE WHEN is_host = 0 AND is_reference = 0 THEN 1 ELSE 0 END) * 1.0 
                      / SUM(CASE WHEN is_host = 0 THEN 1 ELSE 0 END)
                 ELSE NULL 
-            END AS dmi,
-            SUM(is_host) * 1.0 / COUNT(*) AS host_fraction
+            END AS dmi_host_filtered
         FROM sample_hash_status
         GROUP BY sample_id
     """
@@ -436,11 +438,11 @@ def print_summary_statistics(df: pd.DataFrame):
     logger.info("DMI SUMMARY (Host Contamination Removed)")
     logger.info("="*60)
     
-    if 'dmi' not in df.columns:
-        logger.warning("No 'dmi' column found in output - skipping summary")
+    if 'dmi_host_filtered' not in df.columns:
+        logger.warning("No 'dmi_host_filtered' column found in output - skipping summary")
         return
     
-    valid_dmi = df['dmi'].dropna()
+    valid_dmi = df['dmi_host_filtered'].dropna()
     
     if len(valid_dmi) == 0:
         logger.warning("No valid DMI values computed!")
@@ -449,7 +451,7 @@ def print_summary_statistics(df: pd.DataFrame):
     logger.info(f"Samples with valid DMI: {len(valid_dmi):,}")
     
     # DMI statistics
-    logger.info(f"\nDMI Statistics:")
+    logger.info(f"\nDMI Statistics (host-filtered):")
     logger.info(f"  Mean:   {valid_dmi.mean():.4f}")
     logger.info(f"  Median: {valid_dmi.median():.4f}")
     logger.info(f"  Std:    {valid_dmi.std():.4f}")
@@ -481,9 +483,9 @@ def print_summary_statistics(df: pd.DataFrame):
             logger.info(f"  > 10%: {(valid_host >= 0.10).sum():,} ({100*(valid_host >= 0.10).mean():.1f}%)")
     
     # Hash statistics
-    if 'total_hashes_original' in df.columns and 'total_hashes_dmi' in df.columns:
+    if 'total_hashes_original' in df.columns and 'total_hashes_host_filtered' in df.columns:
         orig_hashes = df['total_hashes_original'].sum()
-        final_hashes = df['total_hashes_dmi'].sum()
+        final_hashes = df['total_hashes_host_filtered'].sum()
         removed_hashes = orig_hashes - final_hashes
         
         if orig_hashes > 0:
@@ -492,16 +494,24 @@ def print_summary_statistics(df: pd.DataFrame):
             logger.info(f"  Host hashes removed:   {removed_hashes:,} ({100*removed_hashes/orig_hashes:.2f}%)")
             logger.info(f"  Final hashes for DMI:  {final_hashes:,}")
     
+    # Per-MB statistics if available
+    if 'unmapped_per_mb_host_filtered' in df.columns:
+        valid_unmapped_per_mb = df['unmapped_per_mb_host_filtered'].dropna()
+        if len(valid_unmapped_per_mb) > 0:
+            logger.info(f"\nUnmapped (Dark Matter) Density (host-filtered):")
+            logger.info(f"  Mean unmapped/MB:   {valid_unmapped_per_mb.mean():.2f}")
+            logger.info(f"  Median unmapped/MB: {valid_unmapped_per_mb.median():.2f}")
+    
     # By organism if available
     if 'organism' in df.columns:
         # Filter to rows with valid DMI
-        df_valid = df[df['dmi'].notna()].copy()
+        df_valid = df[df['dmi_host_filtered'].notna()].copy()
         
         if len(df_valid) > 0:
             logger.info("\nTop 10 organisms by sample count:")
             
             # Build aggregation based on available columns
-            agg_dict = {'dmi': ['median', 'mean', 'count']}
+            agg_dict = {'dmi_host_filtered': ['median', 'mean', 'count']}
             if 'host_fraction' in df_valid.columns:
                 agg_dict['host_fraction'] = 'median'
             
@@ -512,11 +522,11 @@ def print_summary_statistics(df: pd.DataFrame):
                 organism_stats.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col 
                                           for col in organism_stats.columns]
                 
-                organism_stats = organism_stats.sort_values('dmi_count', ascending=False).head(10)
+                organism_stats = organism_stats.sort_values('dmi_host_filtered_count', ascending=False).head(10)
                 
                 for org, row in organism_stats.iterrows():
-                    count = int(row['dmi_count'])
-                    dmi_med = row['dmi_median']
+                    count = int(row['dmi_host_filtered_count'])
+                    dmi_med = row['dmi_host_filtered_median']
                     
                     if 'host_fraction_median' in row.index and pd.notna(row['host_fraction_median']):
                         logger.info(f"  {org}: n={count:,}, "
@@ -541,14 +551,19 @@ Prerequisites:
     1. Run extract_human_hashes.py to create the host hash database
     2. Run create_dmi_database.py to create the sample/reference database
 
-Output columns added to parquet:
-    - dmi: Dark Matter Index (computed on non-host hashes)
-    - total_hashes: Non-host hashes (used for DMI calculation)
-    - total_hashes_original: Original hash count (before host removal)
+Output columns added to parquet (all use "_host_filtered" suffix to distinguish
+from original columns):
+    - dmi_host_filtered: Dark Matter Index (computed on non-host hashes)
+    - total_hashes_host_filtered: Non-host hashes (used for DMI calculation)
+    - total_hashes_original: Original hash count from database (before host removal)
     - host_hashes: Number of host hashes removed
     - host_fraction: Fraction of hashes that were host-derived
-    - mapped_hashes: Non-host hashes found in reference
-    - unmapped_hashes: Non-host hashes not in reference
+    - mapped_hashes_host_filtered: Non-host hashes found in reference
+    - unmapped_hashes_host_filtered: Non-host hashes not in reference
+    - hashes_per_mb_host_filtered: Non-host hashes per megabase
+    - unmapped_per_mb_host_filtered: Unmapped non-host hashes per megabase
+    - mapped_per_mb_host_filtered: Mapped non-host hashes per megabase
+    - host_hashes_per_mb: Host hashes per megabase
 
 Examples:
     # RECOMMENDED: Use a file with organism names (one per line)
@@ -751,15 +766,13 @@ Examples:
         else:
             dmi_results = compute_dmi_sql_with_host_removal(conn, args.host_hashes)
         
-        # Rename total_hashes_dmi for compatibility with existing scripts
-        dmi_results = dmi_results.rename(columns={'total_hashes': 'total_hashes_dmi'})
-        
         # Merge results with input
         logger.info("Merging results with input data...")
         
-        # Select columns to merge
-        merge_cols = ['accession', 'dmi', 'total_hashes_dmi', 'total_hashes_original',
-                      'host_hashes', 'host_fraction', 'unmapped_hashes', 'mapped_hashes']
+        # Select columns to merge (using new _host_filtered naming convention)
+        merge_cols = ['accession', 'dmi_host_filtered', 'total_hashes_host_filtered', 
+                      'total_hashes_original', 'host_hashes', 'host_fraction', 
+                      'unmapped_hashes_host_filtered', 'mapped_hashes_host_filtered']
         merge_cols = [c for c in merge_cols if c in dmi_results.columns]
         
         df_output = df_input.merge(
@@ -768,8 +781,55 @@ Examples:
             how='left'
         )
         
+        # Calculate per-MB metrics for host-filtered hashes
+        # Detect which mbases column is available
+        mbases_col = None
+        for col in ['mbases', 'mbases_x', 'mbases_y']:
+            if col in df_output.columns:
+                mbases_col = col
+                break
+        
+        if mbases_col is not None:
+            logger.info(f"Computing per-MB metrics using '{mbases_col}' column...")
+            
+            # Avoid division by zero
+            valid_mbases = df_output[mbases_col] > 0
+            
+            # Hashes per MB (host-filtered)
+            df_output['hashes_per_mb_host_filtered'] = None
+            df_output.loc[valid_mbases, 'hashes_per_mb_host_filtered'] = (
+                df_output.loc[valid_mbases, 'total_hashes_host_filtered'] / 
+                df_output.loc[valid_mbases, mbases_col]
+            )
+            
+            # Unmapped (dark matter) per MB (host-filtered)
+            df_output['unmapped_per_mb_host_filtered'] = None
+            df_output.loc[valid_mbases, 'unmapped_per_mb_host_filtered'] = (
+                df_output.loc[valid_mbases, 'unmapped_hashes_host_filtered'] / 
+                df_output.loc[valid_mbases, mbases_col]
+            )
+            
+            # Mapped per MB (host-filtered)
+            df_output['mapped_per_mb_host_filtered'] = None
+            df_output.loc[valid_mbases, 'mapped_per_mb_host_filtered'] = (
+                df_output.loc[valid_mbases, 'mapped_hashes_host_filtered'] / 
+                df_output.loc[valid_mbases, mbases_col]
+            )
+            
+            # Host hashes per MB
+            df_output['host_hashes_per_mb'] = None
+            df_output.loc[valid_mbases, 'host_hashes_per_mb'] = (
+                df_output.loc[valid_mbases, 'host_hashes'] / 
+                df_output.loc[valid_mbases, mbases_col]
+            )
+            
+            logger.info("  Added: hashes_per_mb_host_filtered, unmapped_per_mb_host_filtered, "
+                       "mapped_per_mb_host_filtered, host_hashes_per_mb")
+        else:
+            logger.warning("No mbases column found - skipping per-MB calculations")
+        
         # Check for missing DMI
-        missing_dmi = df_output['dmi'].isna().sum()
+        missing_dmi = df_output['dmi_host_filtered'].isna().sum()
         if missing_dmi > 0:
             logger.warning(f"{missing_dmi:,} samples have no DMI (not in database)")
         
