@@ -1,0 +1,1 @@
+nohup /usr/bin/time -v bash run_pipeline.sh --metadata-filter "librarysource='METAGENOMIC' AND libraryselection IN ('RANDOM', 'RANDOM PCR') AND mbases>500 AND assay_type='WGS' AND platform='ILLUMINA'" --output-db ../data/intermediate_wgs_metagenomics_illumina.duckdb > run_WGS.log 2>&1 &
