@@ -11,7 +11,7 @@ sketch database.
 
 Each publicly available SRA metagenome in the Logan dataset is represented as a
 FracMinHash sketch (k = 31, scale 1/1000).  Each 64-bit hash value in a sketch
-corresponds to a unique 31-mer.  The analysis tracks when each distinct hash
+corresponds to a unique 31-mer (save for rare hash collisions).  The analysis tracks when each distinct hash
 first appears ("birth year") and last appears ("death year") across the ~4.8
 million metagenomes in the corpus.  From these records we compute cumulative
 sequence diversity growth over fifteen years, per-sample novelty (the fraction
