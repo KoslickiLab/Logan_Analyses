@@ -1,0 +1,191 @@
+Skin dark matter: what the sequences actually are
+==========================================================================
+Cohort      : 1633 'human skin metagenome' runs from body_site_analysis.png
+Dark hashes : non-host AND absent from the full reference union
+              (GenBank WGS/genomes, AllTheBacteria, GTDB, SILVA, TLS,
+               TSA, Logan plasmids/obelisks, Serratus viruses)
+Sketch      : k=31, scaled=1000, seed=42
+
+ASCII-only by design; these reports are read in terminals.
+
+METHODS -- how every number below was produced
+--------------------------------------------------------------------------
+  Cohort selection (01_select_samples.py)
+    source parquet : /scratch/dmk333/Logan_Analyses/verify_diversity_correlation/data/hash_diversity_results_full_cov_0.015625/analysis/filtered_analysis_min_mbases_1620_min_diversity_10/filtered_data_with_dmi_host_removed.parquet
+    filters        : mbases_x >= 100; host_fraction <= 0.95;
+                     total_hashes_host_filtered >= 1000; platform in ['ILLUMINA'];
+                     dmi_host_filtered not null; organism == 'human skin metagenome'
+                     (identical to analyze_body_sites.py, so the cohort is
+                      exactly the points behind body_site_analysis.png)
+
+  Hash classification (02_export_hashes.py)
+    sketches   : FracMinHash, k=31, scaled=1000, seed=42,
+                 max_hash=18446744073709552, murmur3_x64_128 low 64 bits of the
+                 canonical (lexicographic min of fwd/revcomp) 31-mer.
+    host hash  : present in human_hashes_k31.db (HPRC + T2T CHM13 + GRCh38).
+    dark hash  : not host AND absent from the reference union (GenBank WGS,
+                 GenBank genomes, AllTheBacteria, GTDB, SILVA, GenBank TLS,
+                 GenBank TSA, Logan plasmids, Logan obelisks, Serratus viruses).
+    MATCHING IS EXACT 31-mer IDENTITY. There is no similarity threshold: a
+    single substitution destroys a match. At 80% nucleotide identity to a
+    reference, P(a given 31-mer is conserved) = 0.80^31 = 1.0e-3, so a
+    sequence can be 'dark' while still having clear database homologs.
+    Counts were cross-checked against the parquet columns and must agree.
+
+  Sequence extraction (04_extract_sequences.py)
+    Logan contigs streamed from s3://logan-pub/c/{acc}/{acc}.contigs.fa.zst
+    and unitigs from s3://logan-pub/u/... (no credentials, nothing staged).
+    Search uses the FULL non-host hash set; each matched hash is then labelled
+    dark or reference-matched. A record is written out only if it carries at
+    least one dark hash. Hashing calls sourmash's own Rust seq_to_hashes on
+    batched records, validated in 03_validate_hashing.py against both a naive
+    mmh3 canonical-k-mer loop and `sourmash sig kmers` (identical outputs).
+
+  Statistics defined (this section exists because these are easy to conflate)
+    dark_frac     : dark hashes / non-host hashes ON THAT RECORD. Needed
+                    because a long, well-characterised genome carrying one
+                    stray dark k-mer is not dark matter.
+    recovery_frac : distinct dark hashes located in the sequence / total dark
+                    hashes for that run. ~100% expected for unitigs (they are
+                    what the sketch was built from); for contigs it is the
+                    measurement of interest, not a target.
+    assembly rate : fraction of a hash class found anywhere in that run's
+                    contigs, computed by sketching the contigs at the same
+                    scaled and intersecting. Compared dark vs reference-matched.
+    ka            : mean k-mer abundance (coverage) from the Logan FASTA header.
+    GC            : (G + C) / length.
+    entropy3      : Shannon entropy of the 3-mer composition, in bits, max 6.
+    max_homopolymer : longest single-base run.
+    Quantiles are reported as median [25th-75th percentile].
+
+
+0. COHORT PROVENANCE -- read this first
+--------------------------------------------------------------------------
+  PRJNA46333  n= 504  NISC
+  PRJNA906500  n= 216  INDIANA UNIVERSITY SCHOOL OF MEDICINE
+  PRJNA763232  n= 162  UNIVERSITY OF WISCONSIN - MADISON
+  PRJNA471898  n= 119  NISC
+  PRJNA814343  n= 104  AGENCY FOR SCIENCE, TECHNOLOGY AND RESEARCH
+  PRJNA604820  n=  98  NISC
+  PRJNA937066  n=  71  MONASTERIUM LABORATORY
+  PRJNA872116  n=  61  NISC
+  PRJNA642893  n=  59  NISC
+  PRJNA1013332  n=  55  BASF METABOLOME SOLUTIONS GMBH
+  PRJNA935688  n=  45  PENN STATE COLLEGE OF MEDICINE
+  PRJNA277905  n=  31  GENOME INSTITRUTE OF SINGAPORE
+  ... and 17 further bioprojects (108 runs); see skin_samples.csv
+
+  29 bioprojects; largest is 30.9% of the cohort.
+  No single study dominates, so protocol artefacts are less likely to
+  drive the site-level DMI than they are for a single-study cohort.
+
+1. HASH BUDGET (all accessions)
+--------------------------------------------------------------------------
+  non-host hashes exported : 240,887,612
+  dark (no reference match): 99,756,340 (41.4%)
+  reference-matched        : 141,131,272
+
+  dark hashes found on contigs: 9,629,292 / 99,756,340 (9.65%)
+  dark-carrying contigs       : 8,845,049 (2781.7 Mbp)
+
+2. ASSEMBLY RATE BY HASH CLASS  (the headline result)
+--------------------------------------------------------------------------
+  fraction of each class's hashes appearing anywhere in the contigs
+
+  accession                    dark      reference-matched    ratio
+  SRR3184944       3,263/121,146 (2.69%)   9,789/76,539 (12.79%)     4.7x
+  SRR22444199        449/1,365   (32.89%)   2,122/3,896  (54.47%)     1.7x
+  SRR15899544      4,433/15,393  (28.80%)  40,274/67,473 (59.69%)     2.1x
+
+  Interpretation. Sequence that is genuinely novel but real assembles like
+  any other sequence and merely fails to match a database, so its assembly
+  rate should approach that of reference-matched sequence. Sequence that
+  cannot be assembled at all is fragmented: errors, degraded DNA, or
+  single-observation noise. The ratio below is therefore the discriminator.
+  Median ratio here: 2.1x.
+  Dark hashes assemble nearly as well as reference-matched ones. They
+  behave like real organisms that are simply absent from the reference
+  union, not like noise.
+
+3. CHARACTER OF THE DARK-CARRYING CONTIGS  (median [IQR])
+--------------------------------------------------------------------------
+  entropy3 = Shannon entropy of 3-mer composition, max 6 bits;
+  low entropy / long homopolymers = low-complexity repeat sequence.
+
+  SRR3184944
+    dark        n= 3,102  length=49 [49-151]  ka=7.8 [4.1-15.4]  gc=0.516 [0.469-0.566]  max_homopolymer=3 [3-4]  entropy3=4.99 [4.84-5.4]
+    background  n=39,827  length=31 [31-33]  ka=9.5 [4.5-38]  gc=0.484 [0.452-0.516]  max_homopolymer=3 [2-3]  entropy3=4.45 [4.35-4.58]
+
+  SRR22444199
+    dark        n=   392  length=151 [151-190]  ka=2.22 [2-3.3]  gc=0.57 [0.424-0.636]  max_homopolymer=4 [4-5]  entropy3=5.5 [5.38-5.62]
+    background  n= 4,790  length=151 [34-151]  ka=3.3 [2.3-8.24]  gc=0.517 [0.424-0.642]  max_homopolymer=4 [3-5]  entropy3=5.26 [3.64-5.53]
+
+  SRR15899544
+    dark        n= 4,076  length=209 [151-303]  ka=3.7 [2.8-5.4]  gc=0.678 [0.583-0.735]  max_homopolymer=4 [4-5]  entropy3=5.37 [5.16-5.54]
+    background  n=26,523  length=170 [151-238]  ka=3.9 [2.8-6.1]  gc=0.583 [0.472-0.672]  max_homopolymer=4 [4-5]  entropy3=5.46 [5.25-5.61]
+
+  Caution reading this table: the background is every OTHER contig in the
+  file, and Logan contig files are dominated by 31-50 bp low-complexity
+  stubs. So 'dark looks longer and higher-entropy than background' is a
+  statement about the background being junk, not about the dark contigs
+  being remarkable. The meaningful comparisons are:
+    dark GC shifted high (~60-70%) at normal entropy -> reagent 'kitome'
+    dark entropy low / homopolymers long            -> low-complexity repeat
+    dark ka near the detection floor                -> single-observation noise
+  and above all section 2: what fails to assemble at all.
+
+4. DARK DENSITY -- how much of a 'dark' contig is actually dark
+--------------------------------------------------------------------------
+  A contig is written out if it carries >=1 dark hash, but a 100 kb
+  well-characterised genome with one stray dark k-mer is not dark matter.
+  dark_frac = dark hashes / non-host hashes on that contig.
+
+  all dark-carrying contigs : 8,845,049   median dark_frac 1.00
+  contigs >= 1 kb           : 310,652   median dark_frac 0.75
+  fully dark (frac == 1.0)  : 8,386,547 (94.8%)
+  >=1 kb AND dark_frac>=0.8  : 152,025
+
+5. BLAST-ABLE POOL  (>= 300 bp AND dark_frac >= 0.8)
+--------------------------------------------------------------------------
+  contigs written : 956,032
+  total bp        : 742,892,167
+  longest         : 124,998 bp
+  >= 1 kb         : 152,025
+  file            : dark_contigs_blastable.fa  (sorted longest first)
+
+  The >=1 kb, fully-dark subset is the part that is NOT noise:
+    n=152,025   355.1 Mbp   median length 1,549 bp   max 124,998 bp
+    coverage ka  median 11.5 [8.1-19.1]
+    GC           median 0.520 [0.395-0.620] (broad -> mixed origins)
+
+  Multi-kb contigs at tens-of-fold coverage whose hashes are 100% dark
+  cannot be sequencing error. These are the sequences worth identifying.
+  Spread: 1,216 of 1,633 runs contribute; the largest
+  single run holds 2.1% and the top five 8.6%.
+    SRR1620017 (3,217), SRR22444275 (2,947), SRR22444221 (2,467), SRR25936469 (2,338), SRR22444319 (2,095)
+  Spread broadly across runs and studies, which is hard to explain as a per-batch artefact and is consistent with real, site-wide sequence that is missing from the reference union.
+
+FILES
+--------------------------------------------------------------------------
+  small outputs, under results/skin/ (version controlled)
+    skin_accessions.txt             1633 accessions, one per line
+    skin_samples.csv                per-sample metrics + SRA provenance
+    skin_cohort_notes.txt           cohort provenance warnings
+    skin_dark_matter_report.txt     this report
+    sig_manifest.csv                per-accession hash counts vs the parquet
+    assembly_rates.csv              per-class assembly rates (deep-dive runs)
+    contig_profiles.csv             per-contig length/ka/GC/entropy
+    extract_summary_*.csv           per-accession recovery and yield
+    extract_log/<source>/*.txt      per-accession extraction log
+    blast/                          BLAST queries and raw NCBI reports
+
+  bulk artifacts, under data/skin/ (gitignored; see README to regenerate)
+    sigs/nonhost/*.nonhost.sig      all non-host hashes, sourmash format
+    sigs/dark/*.dark.sig            dark hashes only (the DMI numerator)
+    hashes/*.hashes.parquet         min_hash + is_dark, input to extraction
+    seqs/contigs/*.fa.gz            contigs carrying >=1 dark hash
+    seqs/unitigs/*.fa.gz            unitigs carrying dark hashes (pilots only)
+    kmers/*/*.parquet               matched k-mer, position, hash, is_dark, ka
+    dark_contigs_blastable.fa       >=300 bp AND >=80% dark -- BLAST this
+    contig_dark_density.csv         per-contig dark / non-host hash counts
+
